@@ -1,0 +1,58 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`tg-renderer > renders a BUY screen with primary preset buttons > buy.markdown 1`] = `
+"*opentrade · base · 0x1234…78ab · 0\\.1230 \\($1,235\\.00\\) · 3 pos · gas $0\\.18*
+
+_Buy PEPE_
+
+PEPE  Pepe    $2\\.34e\\-5   \\+12\\.40%
+━━━━━━━━━━━━━━━━━
+*MCap*: \`$4,200,000\\.00\`
+*Liq*: \`$890,000\\.00\`
+*Pool*: \`aerodrome\`
+*Holders*: \`2\\.34k\`
+✅ *Honeypot*: \`no\`
+✅ *Rug ratio*: \`0\\.03\`
+✅ *Top10*: \`38%\`
+
+_1\\-4 buy · Tab sell view · i info · r refresh · /cmd · ? help · q quit_
+_Slip 8\\.0% · Anti\\-MEV auto_"
+`;
+
+exports[`tg-renderer > renders a SELL screen with holding block + danger 100% button > sell.markdown 1`] = `
+"*opentrade · base · 0x1234…78ab · 0\\.1230 \\($1,235\\.00\\) · 3 pos · gas $0\\.18*
+
+_Sell PEPE_
+
+PEPE  Pepe    $2\\.34e\\-5   \\+12\\.40%
+━━━━━━━━━━━━━━━━━
+📦 *Hold*: \`1,234,567 PEPE\`
+*USD*: \`$28\\.94\` · *PnL*: \`$9\\.40\` (\`\\+47\\.90%\`)
+✅ *Honeypot*: \`no\`
+✅ *Rug ratio*: \`0\\.03\`
+✅ *Top10*: \`38%\`
+
+_1\\-4 sell % · Tab buy view · i info · r refresh · /cmd · ? help · q quit_
+_Slip 8\\.0%_"
+`;
+
+exports[`tg-renderer > renders a safety-warn screen (info kind) with warning gates > info-warn.markdown 1`] = `
+"*opentrade · base · 0x1234…78ab · 0\\.1230 \\($1,235\\.00\\) · 3 pos · gas $0\\.18*
+
+_PEPE info_
+
+PEPE  Pepe  $2\\.34e\\-5
+*Address*: \`0x1234567890abcdef1234567890abcdef12345678\`
+*MCap*: \`$4,200,000\\.00\`
+*Liquidity*: \`$890,000\\.00\`
+*FDV*: \`—\`
+*Pool*: \`aerodrome\`
+*Pool addr*: \`0xpool\`
+*Holders*: \`2\\.34k\`
+*24h Δ*: \`\\+12\\.40%\`
+✅ *Honeypot*: \`no\`
+🟡 *Rug ratio*: \`0\\.20\`
+✅ *Top10*: \`38%\`
+
+_Esc back · r refresh · q quit_"
+`;
