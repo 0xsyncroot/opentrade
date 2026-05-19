@@ -9,8 +9,8 @@ import {
   buildHeader,
   buildPositionsScreen,
   buildSellScreen,
-} from '@0xsyncroot/opentrade-core/views';
-import type { TokenSnapshot } from '@0xsyncroot/opentrade-core/services';
+} from '@hiepht/opentrade-core/views';
+import type { TokenSnapshot } from '@hiepht/opentrade-core/services';
 import { InkRenderer } from './InkRenderer.js';
 
 const header = buildHeader({

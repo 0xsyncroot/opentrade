@@ -5,8 +5,8 @@
 // cancel → not implemented in core yet (Phase 2 follow-up); surface friendly error
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import * as gmgn from '@0xsyncroot/opentrade-core/gmgn';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import * as gmgn from '@hiepht/opentrade-core/gmgn';
 import { bootstrap, exitWithError, flag, parseChainArg } from './_shared.js';
 import { emitJson, log, renderTable } from '../render/cli-renderer.js';
 import { walletFor } from '../config/wallets.js';

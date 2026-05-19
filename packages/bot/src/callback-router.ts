@@ -4,7 +4,7 @@
 // Intent dispatcher".
 
 import type { Context } from 'grammy';
-import { actions as actionsNs, type schemas } from '@0xsyncroot/opentrade-core';
+import { actions as actionsNs, type schemas } from '@hiepht/opentrade-core';
 import type { renderScreen } from './render/tg-renderer.js';
 
 export const CALLBACK_PREFIX = 'act:';

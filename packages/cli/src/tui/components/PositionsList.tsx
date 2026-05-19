@@ -2,7 +2,7 @@
 
 import { Box, Text } from 'ink';
 import React from 'react';
-import type { Holding } from '@0xsyncroot/opentrade-core/gmgn';
+import type { Holding } from '@hiepht/opentrade-core/gmgn';
 import { theme } from '../theme.js';
 
 export interface PositionsListProps {

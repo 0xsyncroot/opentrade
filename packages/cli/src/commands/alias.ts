@@ -1,7 +1,7 @@
 // `opentrade alias {save|ls|rm}` — saved trade preset shortcuts.
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
+import type { Chain } from '@hiepht/opentrade-core/chains';
 import { bootstrap, exitWithError, flag, parseChainArg } from './_shared.js';
 import { readAliases, writeAliases } from '../config/load.js';
 import type { Alias } from '../config/schema.js';

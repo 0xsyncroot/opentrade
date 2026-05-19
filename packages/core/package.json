@@ -1,10 +1,8 @@
 {
-  "name": "@0xsyncroot/opentrade-core",
+  "name": "@hiepht/opentrade-core",
   "version": "0.0.1",
-  "description": "Core GMGN client, schemas, services, view builders for opentrade",
-  "publishConfig": {
-    "access": "public"
-  },
+  "private": true,
+  "description": "Internal core for @hiepht/opentrade — not published, bundled into the CLI artifact at build time.",
   "type": "module",
   "exports": {
     ".": {

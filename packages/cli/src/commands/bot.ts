@@ -6,7 +6,7 @@
 //   - stop : SIGTERM the PID
 //   - status: report running + tail log
 //
-// Architecture note: when @0xsyncroot/opentrade-bot exports a `startBot()` function
+// Architecture note: when @hiepht/opentrade-bot exports a `startBot()` function
 // in the future, this command becomes a thin wrapper that imports and calls it
 // directly in-process. For v1 we use child_process for stability (no React/Ink
 // pulled in, no overlap with TUI mount).
@@ -48,7 +48,7 @@ export const botCmd = defineCommand({
         const botEntry = resolveBotEntry();
         if (!botEntry) {
           log.error(
-            'cannot find @0xsyncroot/opentrade-bot dist/main.js. Build the bot package first (Phase 4): `pnpm --filter @0xsyncroot/opentrade-bot build`.',
+            'cannot find @hiepht/opentrade-bot dist/main.js. Build the bot package first (Phase 4): `pnpm --filter @hiepht/opentrade-bot build`.',
           );
           process.exit(2);
         }
@@ -144,7 +144,7 @@ function tailFile(file: string, lines: number): string {
 function resolveBotEntry(): string | undefined {
   const candidates = [
     // installed via workspace dep — symlink in cli/node_modules
-    path.join(process.cwd(), 'node_modules', '@0xsyncroot', 'opentrade-bot', 'dist', 'main.js'),
+    path.join(process.cwd(), 'node_modules', '@hiepht', 'opentrade-bot', 'dist', 'main.js'),
     // monorepo direct path (dev)
     path.join(process.cwd(), '..', 'bot', 'dist', 'main.js'),
     path.join(process.cwd(), 'packages', 'bot', 'dist', 'main.js'),

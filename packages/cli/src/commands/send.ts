@@ -13,9 +13,9 @@
 // of letting users practice the muscle memory first.
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import { isEvmChain, NATIVE_INPUT_TOKEN, NATIVE_SYMBOL, nativeAmountToWei } from '@0xsyncroot/opentrade-core/chains';
-import { SendIntentSchema, type SendIntent } from '@0xsyncroot/opentrade-core/schemas';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import { isEvmChain, NATIVE_INPUT_TOKEN, NATIVE_SYMBOL, nativeAmountToWei } from '@hiepht/opentrade-core/chains';
+import { SendIntentSchema, type SendIntent } from '@hiepht/opentrade-core/schemas';
 import { bootstrap, exitWithError, flag, parseChainArg } from './_shared.js';
 import { decideTier, runConfirmation } from '../safety/confirm.js';
 import { emitJson, log, color } from '../render/cli-renderer.js';

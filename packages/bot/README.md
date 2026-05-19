@@ -1,18 +1,18 @@
-# @0xsyncroot/opentrade-bot
+# @hiepht/opentrade-bot
 
-Telegram bot for [`@0xsyncroot/opentrade`](https://www.npmjs.com/package/@0xsyncroot/opentrade). Single-owner whitelist, mirrors the TUI UX through the same `Screen` JSON + Intent dispatcher.
+Telegram bot for [`@hiepht/opentrade`](https://www.npmjs.com/package/@hiepht/opentrade). Single-owner whitelist, mirrors the TUI UX through the same `Screen` JSON + Intent dispatcher.
 
 Two ways to run it:
 
 ## 1. Auto-launched by the CLI (default for personal use)
 
-When you run `opentrade` (zero-arg, TTY) and your config has both `telegram.botToken` and `telegram.ownerChatId`, the CLI dynamic-imports `@0xsyncroot/opentrade-bot/start` and runs it on the same event loop as the Ink TUI. Buy/sell from your phone, see the position update in the terminal instantly. Press `T` in the TUI to toggle the bot at runtime.
+When you run `opentrade` (zero-arg, TTY) and your config has both `telegram.botToken` and `telegram.ownerChatId`, the CLI dynamic-imports `@hiepht/opentrade-bot/start` and runs it on the same event loop as the Ink TUI. Buy/sell from your phone, see the position update in the terminal instantly. Press `T` in the TUI to toggle the bot at runtime.
 
-No separate install needed — this package is a regular dependency of `@0xsyncroot/opentrade`.
+No separate install needed — this package is a regular dependency of `@hiepht/opentrade`.
 
 ## 2. Headless / VPS deploy
 
-`@0xsyncroot/opentrade-bot` also ships an `opentrade-bot` binary that runs polling-only with no TUI alongside. Useful when you want the bot up 24/7 on a server.
+`@hiepht/opentrade-bot` also ships an `opentrade-bot` binary that runs polling-only with no TUI alongside. Useful when you want the bot up 24/7 on a server.
 
 ```bash
 TELEGRAM_BOT_TOKEN=… \
@@ -43,7 +43,7 @@ docker run -d \
 ## Programmatic embedding
 
 ```ts
-import { startBot } from '@0xsyncroot/opentrade-bot/start';
+import { startBot } from '@hiepht/opentrade-bot/start';
 
 const handle = await startBot({
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN!,

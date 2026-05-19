@@ -5,11 +5,11 @@
 //   - same zustand store is shared so phone trades update the TUI positions list
 //   - graceful shutdown on quit with a 2s timeout
 //
-// The `@0xsyncroot/opentrade-bot` package ships in Phase 4. We import it dynamically
+// The `@hiepht/opentrade-bot` package ships in Phase 4. We import it dynamically
 // and degrade gracefully when it's not installed — that way Phase 3 TUI works
 // today and seamlessly picks up the bot once Phase 4 lands.
 
-import type { DispatcherContext } from '@0xsyncroot/opentrade-core/actions';
+import type { DispatcherContext } from '@hiepht/opentrade-core/actions';
 import type { OpentradeConfig } from './hooks/useConfig.js';
 import type { BotHandle, TuiState } from './store/index.js';
 
@@ -39,7 +39,7 @@ export async function loadBotModule(): Promise<BotModule | null> {
   try {
     // The Phase 4 bot package exports `startBot` from its `/start` subpath.
     // Wrapped in eval so bundlers don't try to resolve at build time.
-    const moduleId = '@0xsyncroot/opentrade-bot/start';
+    const moduleId = '@hiepht/opentrade-bot/start';
     const mod = (await import(/* @vite-ignore */ moduleId)) as Partial<BotModule>;
     if (typeof mod.startBot === 'function') return mod as BotModule;
     return null;

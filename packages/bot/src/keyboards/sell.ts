@@ -3,7 +3,7 @@
 // extras we may add (e.g. set limit price, set trailing stop).
 
 import { InlineKeyboard } from 'grammy';
-import type { actions as actionsNs, schemas } from '@0xsyncroot/opentrade-core';
+import type { actions as actionsNs, schemas } from '@hiepht/opentrade-core';
 
 export interface SellExtrasOptions {
   intent: schemas.SellIntent;

@@ -9,8 +9,8 @@
 // @clack/prompts flow.
 
 import * as p from '@clack/prompts';
-import type { Intent } from '@0xsyncroot/opentrade-core/schemas';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
+import type { Intent } from '@hiepht/opentrade-core/schemas';
+import type { Chain } from '@hiepht/opentrade-core/chains';
 
 export type ConfirmTier = 'T0' | 'T1' | 'T2' | 'T3';
 

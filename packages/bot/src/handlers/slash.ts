@@ -11,9 +11,9 @@ import {
   views as viewsNs,
   schemas,
   presets as presetsNs,
-} from '@0xsyncroot/opentrade-core';
-import type { actions as actionsNs } from '@0xsyncroot/opentrade-core';
-import type { GmgnClient } from '@0xsyncroot/opentrade-core/gmgn';
+} from '@hiepht/opentrade-core';
+import type { actions as actionsNs } from '@hiepht/opentrade-core';
+import type { GmgnClient } from '@hiepht/opentrade-core/gmgn';
 import type { renderScreen } from '../render/tg-renderer.js';
 import { escMd } from '../render/tg-renderer.js';
 

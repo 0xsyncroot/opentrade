@@ -13,12 +13,12 @@ import {
   actions as actionsApi,
   services,
   views,
-} from '@0xsyncroot/opentrade-core';
-import type { GmgnClient } from '@0xsyncroot/opentrade-core/gmgn';
-import type { DispatcherContext } from '@0xsyncroot/opentrade-core/actions';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import { classifier } from '@0xsyncroot/opentrade-core';
-import type { Intent, Screen } from '@0xsyncroot/opentrade-core/schemas';
+} from '@hiepht/opentrade-core';
+import type { GmgnClient } from '@hiepht/opentrade-core/gmgn';
+import type { DispatcherContext } from '@hiepht/opentrade-core/actions';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import { classifier } from '@hiepht/opentrade-core';
+import type { Intent, Screen } from '@hiepht/opentrade-core/schemas';
 import { ConfirmModal, decideConfirmTier } from './components/ConfirmModal.js';
 import { Footer } from './components/Footer.js';
 import { HelpOverlay } from './components/HelpOverlay.js';
@@ -54,7 +54,7 @@ export interface AppProps {
   /** When true, render even without a client (used in tests). */
   testMode?: boolean;
   /** Optional pre-loaded snapshot — testing only. */
-  initialSnapshot?: import('@0xsyncroot/opentrade-core/services').TokenSnapshot;
+  initialSnapshot?: import('@hiepht/opentrade-core/services').TokenSnapshot;
   /** Hook so tests can inspect dispatcher invocations. */
   onIntent?: (intent: Intent) => void;
   /** Override fetch — testing only. */

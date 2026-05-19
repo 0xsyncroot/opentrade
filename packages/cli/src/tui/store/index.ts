@@ -10,10 +10,10 @@
 //   - inflightSeq (race-safe paste fetch — incremented every new fetch)
 
 import { create } from 'zustand';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import type { Holding } from '@0xsyncroot/opentrade-core/gmgn';
-import type { Screen } from '@0xsyncroot/opentrade-core/schemas';
-import type { TokenSnapshot } from '@0xsyncroot/opentrade-core/services';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import type { Holding } from '@hiepht/opentrade-core/gmgn';
+import type { Screen } from '@hiepht/opentrade-core/schemas';
+import type { TokenSnapshot } from '@hiepht/opentrade-core/services';
 
 export type Mode = 'buy' | 'sell';
 
@@ -22,7 +22,7 @@ export interface ModalDescriptor {
   tier: 'T0' | 'T1' | 'T2' | 'T3';
   /** Free-form payload — used by ConfirmModal to render preview and resolve(). */
   payload: {
-    intent: import('@0xsyncroot/opentrade-core/schemas').Intent;
+    intent: import('@hiepht/opentrade-core/schemas').Intent;
     summary: string;
     safetyReasons?: string[];
     confirmSymbol?: string;

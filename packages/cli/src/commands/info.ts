@@ -1,9 +1,9 @@
 // `opentrade info <chain> <token>` — token card via core Screen builder.
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import { fetchTokenSnapshot } from '@0xsyncroot/opentrade-core/services';
-import { buildInfoScreen, buildHeader } from '@0xsyncroot/opentrade-core/views';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import { fetchTokenSnapshot } from '@hiepht/opentrade-core/services';
+import { buildInfoScreen, buildHeader } from '@hiepht/opentrade-core/views';
 import { bootstrap, exitWithError, flag, parseChainArg } from './_shared.js';
 import { emitJson, renderScreen } from '../render/cli-renderer.js';
 import { walletFor } from '../config/wallets.js';

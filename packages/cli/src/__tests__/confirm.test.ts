@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decideTier } from '../safety/confirm.js';
-import type { BuyIntent, SellIntent, SendIntent } from '@0xsyncroot/opentrade-core/schemas';
+import type { BuyIntent, SellIntent, SendIntent } from '@hiepht/opentrade-core/schemas';
 
 const buy = (chain: 'base' | 'eth' | 'sol' | 'bsc', amountWei: string): BuyIntent => ({
   kind: 'buy',

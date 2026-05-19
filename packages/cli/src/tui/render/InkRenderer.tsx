@@ -5,7 +5,7 @@
 
 import { Box, Text } from 'ink';
 import React from 'react';
-import type { Block, Screen } from '@0xsyncroot/opentrade-core/schemas';
+import type { Block, Screen } from '@hiepht/opentrade-core/schemas';
 import { SafetyBlock } from '../components/SafetyBlock.js';
 import { blockTone, theme } from '../theme.js';
 

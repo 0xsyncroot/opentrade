@@ -1,7 +1,7 @@
 // `opentrade w` — wallet summary.
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
+import type { Chain } from '@hiepht/opentrade-core/chains';
 import { bootstrap, flag } from './_shared.js';
 import { emitJson, renderKv } from '../render/cli-renderer.js';
 

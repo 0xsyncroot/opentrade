@@ -1,11 +1,11 @@
 // `opentrade sell <chain> <token> [percent=100]`
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import { SellIntentSchema, type SellIntent } from '@0xsyncroot/opentrade-core/schemas';
-import { dispatch } from '@0xsyncroot/opentrade-core/actions';
-import { fetchTokenSnapshot } from '@0xsyncroot/opentrade-core/services';
-import { DEFAULT_PRESETS } from '@0xsyncroot/opentrade-core/presets';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import { SellIntentSchema, type SellIntent } from '@hiepht/opentrade-core/schemas';
+import { dispatch } from '@hiepht/opentrade-core/actions';
+import { fetchTokenSnapshot } from '@hiepht/opentrade-core/services';
+import { DEFAULT_PRESETS } from '@hiepht/opentrade-core/presets';
 import { bootstrap, exitWithError, flag, intFlag, parseChainArg } from './_shared.js';
 import { decideTier, runConfirmation } from '../safety/confirm.js';
 import { emitJson, log, color } from '../render/cli-renderer.js';

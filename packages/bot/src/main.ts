@@ -6,7 +6,7 @@
 import { loadBotEnv, walletsFromEnv } from './env.js';
 import { startBot, type BotHandle } from './start.js';
 import { makeRecordTrade } from './audit.js';
-import { actions as actionsNs, gmgn as gmgnNs } from '@0xsyncroot/opentrade-core';
+import { actions as actionsNs, gmgn as gmgnNs } from '@hiepht/opentrade-core';
 
 const HELP = `opentrade-bot — Telegram bot for opentrade
 

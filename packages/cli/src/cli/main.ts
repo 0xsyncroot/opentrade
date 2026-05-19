@@ -27,7 +27,7 @@ import { botCmd } from '../commands/bot.js';
 const main = defineCommand({
   meta: {
     name: 'opentrade',
-    version: '0.0.1',
+    version: '0.0.2',
     description:
       'Fast GMGN trading CLI — interactive TUI (zero-arg) + non-interactive subcommands. Base / Solana / ETH / BSC.',
   },

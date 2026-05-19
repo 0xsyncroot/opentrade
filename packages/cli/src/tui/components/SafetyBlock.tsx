@@ -2,7 +2,7 @@
 
 import { Box, Text } from 'ink';
 import React from 'react';
-import type { SafetyGate } from '@0xsyncroot/opentrade-core/schemas';
+import type { SafetyGate } from '@hiepht/opentrade-core/schemas';
 import { safetyTone } from '../theme.js';
 
 export interface SafetyBlockProps {

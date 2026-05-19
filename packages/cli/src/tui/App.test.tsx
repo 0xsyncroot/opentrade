@@ -7,7 +7,7 @@ import { render } from 'ink-testing-library';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { TokenSnapshot } from '@0xsyncroot/opentrade-core/services';
+import type { TokenSnapshot } from '@hiepht/opentrade-core/services';
 import { App } from './App.js';
 import { useTuiStore } from './store/index.js';
 
@@ -85,7 +85,7 @@ describe('App paste + Tab + preset 1', () => {
     const { stdin, lastFrame, frames } = render(
       tree({
         ...baseProps,
-        fetchSnapshotImpl: fetchImpl as unknown as typeof import('@0xsyncroot/opentrade-core/services').fetchTokenSnapshot,
+        fetchSnapshotImpl: fetchImpl as unknown as typeof import('@hiepht/opentrade-core/services').fetchTokenSnapshot,
       }),
     );
     await settle(60);
@@ -147,7 +147,7 @@ describe('App paste + Tab + preset 1', () => {
     const { stdin } = render(
       tree({
         ...baseProps,
-        fetchSnapshotImpl: fetchImpl as unknown as typeof import('@0xsyncroot/opentrade-core/services').fetchTokenSnapshot,
+        fetchSnapshotImpl: fetchImpl as unknown as typeof import('@hiepht/opentrade-core/services').fetchTokenSnapshot,
       }),
     );
     await settle(60);

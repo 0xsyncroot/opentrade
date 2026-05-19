@@ -10,11 +10,11 @@
 // All queries pause while the user is actively typing (debounce 1s after last
 // keystroke; the App owns that flag and writes it to the store).
 
-import { services } from '@0xsyncroot/opentrade-core';
-import type { GmgnClient } from '@0xsyncroot/opentrade-core/gmgn';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import type { Holding } from '@0xsyncroot/opentrade-core/gmgn';
-import type { TokenSnapshot } from '@0xsyncroot/opentrade-core/services';
+import { services } from '@hiepht/opentrade-core';
+import type { GmgnClient } from '@hiepht/opentrade-core/gmgn';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import type { Holding } from '@hiepht/opentrade-core/gmgn';
+import type { TokenSnapshot } from '@hiepht/opentrade-core/services';
 import { useQuery } from '@tanstack/react-query';
 
 const { fetchTokenSnapshot, listHoldings } = services;

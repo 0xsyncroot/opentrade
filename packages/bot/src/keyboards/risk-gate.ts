@@ -4,7 +4,7 @@
 // before we surface the real buy/sell presets.
 
 import { InlineKeyboard } from 'grammy';
-import type { actions as actionsNs, schemas } from '@0xsyncroot/opentrade-core';
+import type { actions as actionsNs, schemas } from '@hiepht/opentrade-core';
 
 export interface BuildRiskGateOptions {
   intent: schemas.Intent;

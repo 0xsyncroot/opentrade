@@ -1,6 +1,6 @@
 // Helpers for working with the per-chain wallet map.
 
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
+import type { Chain } from '@hiepht/opentrade-core/chains';
 import type { OpentradeConfig } from './schema.js';
 
 export function walletFor(cfg: OpentradeConfig, chain: Chain): string | undefined {

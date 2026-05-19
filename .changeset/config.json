@@ -7,5 +7,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": []
+  "ignore": ["@hiepht/opentrade-core", "@hiepht/opentrade-bot"]
 }

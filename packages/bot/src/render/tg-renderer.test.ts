@@ -3,8 +3,8 @@ import {
   views as viewsNs,
   actions as actionsNs,
   type schemas,
-} from '@0xsyncroot/opentrade-core';
-import type { services } from '@0xsyncroot/opentrade-core';
+} from '@hiepht/opentrade-core';
+import type { services } from '@hiepht/opentrade-core';
 import { renderScreen, escMd } from './tg-renderer.js';
 
 // Deterministic snapshot test data — matches the shape used by core/views/tests.

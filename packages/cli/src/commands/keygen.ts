@@ -10,7 +10,7 @@ import { defineCommand } from 'citty';
 import {
   generateEd25519Keypair,
   extractPublicFromPrivate,
-} from '@0xsyncroot/opentrade-core/gmgn';
+} from '@hiepht/opentrade-core/gmgn';
 import { resolvePaths } from '../config/paths.js';
 import { copyToClipboard } from '../clipboard.js';
 import { log, color } from '../render/cli-renderer.js';

@@ -10,8 +10,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Intent } from '@0xsyncroot/opentrade-core/schemas';
-import type { TradeRecord } from '@0xsyncroot/opentrade-core/actions';
+import type { Intent } from '@hiepht/opentrade-core/schemas';
+import type { TradeRecord } from '@hiepht/opentrade-core/actions';
 import type { OpentradePaths } from '../config/paths.js';
 
 export interface AuditOpts {

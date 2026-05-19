@@ -1,7 +1,8 @@
 {
-  "name": "@0xsyncroot/opentrade-bot",
+  "name": "@hiepht/opentrade-bot",
   "version": "0.0.1",
-  "description": "Telegram bot for opentrade (single-owner whitelist).",
+  "private": true,
+  "description": "Internal Telegram bot module for @hiepht/opentrade — not published, bundled into the CLI artifact at build time.",
   "type": "module",
   "main": "./dist/main.js",
   "module": "./dist/main.js",
@@ -16,15 +17,6 @@
       "import": "./dist/start.js"
     }
   },
-  "files": [
-    "dist"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "bin": {
-    "opentrade-bot": "./dist/main.js"
-  },
   "scripts": {
     "build": "tsup",
     "dev": "tsx watch src/main.ts",
@@ -34,7 +26,7 @@
   },
   "dependencies": {
     "@grammyjs/conversations": "^2.0.1",
-    "@0xsyncroot/opentrade-core": "workspace:*",
+    "@hiepht/opentrade-core": "workspace:*",
     "consola": "^3.3.3",
     "grammy": "^1.32.0",
     "zod": "^3.24.1"

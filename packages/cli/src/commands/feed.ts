@@ -1,8 +1,8 @@
 // `opentrade feed {trending|sm|kol|trenches|kline}` — read-only signal feeds.
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import * as gmgn from '@0xsyncroot/opentrade-core/gmgn';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import * as gmgn from '@hiepht/opentrade-core/gmgn';
 import { bootstrap, exitWithError, flag, parseChainArg } from './_shared.js';
 import { emitJson, log, renderTable } from '../render/cli-renderer.js';
 

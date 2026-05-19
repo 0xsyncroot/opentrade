@@ -4,7 +4,7 @@
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import type { ActionButton } from '@0xsyncroot/opentrade-core/schemas';
+import type { ActionButton } from '@hiepht/opentrade-core/schemas';
 import { BuyPanel } from './BuyPanel.js';
 import { SellPanel } from './SellPanel.js';
 

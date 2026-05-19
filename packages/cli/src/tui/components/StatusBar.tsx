@@ -4,7 +4,7 @@
 
 import { Box, Text } from 'ink';
 import React from 'react';
-import type { ScreenHeader } from '@0xsyncroot/opentrade-core/schemas';
+import type { ScreenHeader } from '@hiepht/opentrade-core/schemas';
 import { theme } from '../theme.js';
 import { useTuiStore, type BotStatus } from '../store/index.js';
 

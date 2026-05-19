@@ -2,7 +2,7 @@
 // the inflightSeq race counter.
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { TokenSnapshot } from '@0xsyncroot/opentrade-core/services';
+import type { TokenSnapshot } from '@hiepht/opentrade-core/services';
 import { useTuiStore } from './index.js';
 
 const snapshot = (usdValue: number | undefined): TokenSnapshot => ({

@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { actions as actionsNs } from '@0xsyncroot/opentrade-core';
+import type { actions as actionsNs } from '@hiepht/opentrade-core';
 
 const AUTO_TRADING_EXECUTOR_DIR = '/root/develop/auto-trading/memory/agents/executor';
 const XDG_TRADES_DIR = path.join(os.homedir(), '.config', 'opentrade');

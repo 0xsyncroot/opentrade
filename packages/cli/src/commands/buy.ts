@@ -3,11 +3,11 @@
 // Builds a BuyIntent, runs the 4-tier confirmation, dispatches through core.
 
 import { defineCommand } from 'citty';
-import { nativeAmountToWei, type Chain } from '@0xsyncroot/opentrade-core/chains';
-import { BuyIntentSchema, type BuyIntent, type TpSlTier } from '@0xsyncroot/opentrade-core/schemas';
-import { dispatch } from '@0xsyncroot/opentrade-core/actions';
-import { fetchTokenSnapshot } from '@0xsyncroot/opentrade-core/services';
-import { DEFAULT_PRESETS } from '@0xsyncroot/opentrade-core/presets';
+import { nativeAmountToWei, type Chain } from '@hiepht/opentrade-core/chains';
+import { BuyIntentSchema, type BuyIntent, type TpSlTier } from '@hiepht/opentrade-core/schemas';
+import { dispatch } from '@hiepht/opentrade-core/actions';
+import { fetchTokenSnapshot } from '@hiepht/opentrade-core/services';
+import { DEFAULT_PRESETS } from '@hiepht/opentrade-core/presets';
 import { bootstrap, exitWithError, flag, intFlag, parseChainArg, strFlag } from './_shared.js';
 import { decideTier, runConfirmation } from '../safety/confirm.js';
 import { emitJson, log, color } from '../render/cli-renderer.js';

@@ -1,8 +1,8 @@
 // `opentrade ab {add|ls|rm|whitelist}` — address book.
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import { EXPLORER_ADDR } from '@0xsyncroot/opentrade-core/chains';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import { EXPLORER_ADDR } from '@hiepht/opentrade-core/chains';
 import { bootstrap, exitWithError, flag, parseChainArg } from './_shared.js';
 import { readAddressBook, writeAddressBook } from '../config/load.js';
 import type { AddressBookEntry } from '../config/schema.js';

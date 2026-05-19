@@ -32,12 +32,12 @@ importers:
 
   packages/bot:
     dependencies:
-      '@0xsyncroot/opentrade-core':
-        specifier: workspace:*
-        version: link:../core
       '@grammyjs/conversations':
         specifier: ^2.0.1
         version: 2.1.1(grammy@1.43.0)
+      '@hiepht/opentrade-core':
+        specifier: workspace:*
+        version: link:../core
       consola:
         specifier: ^3.3.3
         version: 3.4.2
@@ -54,15 +54,12 @@ importers:
 
   packages/cli:
     dependencies:
-      '@0xsyncroot/opentrade-bot':
-        specifier: workspace:*
-        version: link:../bot
-      '@0xsyncroot/opentrade-core':
-        specifier: workspace:*
-        version: link:../core
       '@clack/prompts':
         specifier: ^0.9.0
         version: 0.9.1
+      '@grammyjs/conversations':
+        specifier: ^2.0.1
+        version: 2.1.1(grammy@1.43.0)
       '@tanstack/react-query':
         specifier: ^5.62.16
         version: 5.100.11(react@18.3.1)
@@ -78,6 +75,9 @@ importers:
       cosmiconfig:
         specifier: ^9.0.0
         version: 9.0.1(typescript@5.9.3)
+      grammy:
+        specifier: ^1.32.0
+        version: 1.43.0
       ink:
         specifier: ^5.1.0
         version: 5.2.1(@types/react@18.3.28)(react@18.3.1)
@@ -90,6 +90,9 @@ importers:
       react:
         specifier: ^18.3.1
         version: 18.3.1
+      undici:
+        specifier: ^7.2.0
+        version: 7.25.0
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -97,6 +100,12 @@ importers:
         specifier: ^5.0.2
         version: 5.0.13(@types/react@18.3.28)(react@18.3.1)
     devDependencies:
+      '@hiepht/opentrade-bot':
+        specifier: workspace:*
+        version: link:../bot
+      '@hiepht/opentrade-core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: ^22.10.5
         version: 22.19.19

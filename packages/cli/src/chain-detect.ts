@@ -1,8 +1,8 @@
 // Given a token address (or a URL), guess which chain it belongs to.
 // Thin wrapper over core/classifier for the CLI subcommand entry points.
 
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import { classifyInput } from '@0xsyncroot/opentrade-core/classifier';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import { classifyInput } from '@hiepht/opentrade-core/classifier';
 
 export interface DetectedChain {
   chain: Chain;

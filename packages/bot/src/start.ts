@@ -13,7 +13,7 @@ import {
   actions as actionsNs,
   classifier as classifierNs,
   schemas,
-} from '@0xsyncroot/opentrade-core';
+} from '@hiepht/opentrade-core';
 import { WhitelistAuth } from './auth.js';
 import { makeCallbackRouter } from './callback-router.js';
 import { renderScreen } from './render/tg-renderer.js';

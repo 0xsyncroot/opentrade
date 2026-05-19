@@ -3,7 +3,7 @@
 
 import { consola } from 'consola';
 import Table from 'cli-table3';
-import type { Screen, Block, SafetyGate } from '@0xsyncroot/opentrade-core/schemas';
+import type { Screen, Block, SafetyGate } from '@hiepht/opentrade-core/schemas';
 
 export interface RenderOpts {
   json?: boolean;

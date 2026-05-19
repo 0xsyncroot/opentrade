@@ -5,11 +5,11 @@
 // strategy create lands when the core service is filled in.
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import { nativeAmountToWei } from '@0xsyncroot/opentrade-core/chains';
-import type { LimitIntent } from '@0xsyncroot/opentrade-core/schemas';
-import { LimitIntentSchema } from '@0xsyncroot/opentrade-core/schemas';
-import { dispatch } from '@0xsyncroot/opentrade-core/actions';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import { nativeAmountToWei } from '@hiepht/opentrade-core/chains';
+import type { LimitIntent } from '@hiepht/opentrade-core/schemas';
+import { LimitIntentSchema } from '@hiepht/opentrade-core/schemas';
+import { dispatch } from '@hiepht/opentrade-core/actions';
 import { bootstrap, exitWithError, flag, intFlag, parseChainArg } from './_shared.js';
 import { emitJson, log } from '../render/cli-renderer.js';
 import { walletFor } from '../config/wallets.js';

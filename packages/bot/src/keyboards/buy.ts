@@ -4,7 +4,7 @@
 // Screen schema doesn't represent yet.
 
 import { InlineKeyboard } from 'grammy';
-import type { actions as actionsNs, schemas } from '@0xsyncroot/opentrade-core';
+import type { actions as actionsNs, schemas } from '@hiepht/opentrade-core';
 
 export interface BuyExtrasOptions {
   intent: schemas.BuyIntent;

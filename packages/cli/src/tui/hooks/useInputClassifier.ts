@@ -1,8 +1,8 @@
 // Thin wrapper around core/classifier.classifyInput with a 50ms debounce so we
 // don't re-classify on every keystroke while the user is mid-paste.
 
-import { classifier } from '@0xsyncroot/opentrade-core';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
+import { classifier } from '@hiepht/opentrade-core';
+import type { Chain } from '@hiepht/opentrade-core/chains';
 import { useEffect, useState } from 'react';
 
 const { classifyInput } = classifier;

@@ -11,9 +11,9 @@ import {
   services as servicesNs,
   views as viewsNs,
   schemas,
-} from '@0xsyncroot/opentrade-core';
-import type { actions as actionsNs } from '@0xsyncroot/opentrade-core';
-import type { GmgnClient } from '@0xsyncroot/opentrade-core/gmgn';
+} from '@hiepht/opentrade-core';
+import type { actions as actionsNs } from '@hiepht/opentrade-core';
+import type { GmgnClient } from '@hiepht/opentrade-core/gmgn';
 import type { renderScreen } from '../render/tg-renderer.js';
 import type { RiskGateState } from '../keyboards/risk-gate.js';
 

@@ -2,7 +2,7 @@
 // the owner knows the bot is alive and pointing at the right wallets.
 
 import type { Context } from 'grammy';
-import type { schemas } from '@0xsyncroot/opentrade-core';
+import type { schemas } from '@hiepht/opentrade-core';
 import { escMd } from '../render/tg-renderer.js';
 
 export interface StartHandlerDeps {

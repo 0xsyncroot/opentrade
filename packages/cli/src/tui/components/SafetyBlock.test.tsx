@@ -3,7 +3,7 @@
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import type { SafetyGate } from '@0xsyncroot/opentrade-core/schemas';
+import type { SafetyGate } from '@hiepht/opentrade-core/schemas';
 import { SafetyBlock } from './SafetyBlock.js';
 
 describe('SafetyBlock', () => {

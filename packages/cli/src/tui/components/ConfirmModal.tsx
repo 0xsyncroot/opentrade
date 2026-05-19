@@ -118,7 +118,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({ modal, typedText, on
  *   - sell 100%                                         → at least T1
  */
 export function decideConfirmTier(input: {
-  intent: import('@0xsyncroot/opentrade-core/schemas').Intent;
+  intent: import('@hiepht/opentrade-core/schemas').Intent;
   walletUsd: number | undefined;
   tradeUsd: number | undefined;
   safetyWarn?: boolean;

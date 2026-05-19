@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { formatTradeBlock, recordTrade } from '../audit/trade-log.js';
 import { resolvePaths } from '../config/paths.js';
-import type { TradeRecord } from '@0xsyncroot/opentrade-core/actions';
+import type { TradeRecord } from '@hiepht/opentrade-core/actions';
 
 const sampleSuccess: TradeRecord = {
   kind: 'buy',

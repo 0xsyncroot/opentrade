@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { actions as actionsNs, type schemas, gmgn as gmgnNs } from '@0xsyncroot/opentrade-core';
+import { actions as actionsNs, type schemas, gmgn as gmgnNs } from '@hiepht/opentrade-core';
 import { routeCallbackData, EXPIRED_MESSAGE, CALLBACK_PREFIX } from './callback-router.js';
 
 function makeDispatcherCtx(): actionsNs.DispatcherContext {

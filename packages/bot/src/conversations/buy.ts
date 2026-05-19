@@ -6,7 +6,7 @@
 // 95% of the journey. We leave a small typed builder here so the wizard can
 // snap in without changing the rest of the bot wiring.
 
-import type { schemas } from '@0xsyncroot/opentrade-core';
+import type { schemas } from '@hiepht/opentrade-core';
 
 export interface BuyWizardState {
   chain?: schemas.Chain;

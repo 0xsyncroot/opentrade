@@ -12,7 +12,7 @@
 //                 intent is a fully-decorated BuyIntent with TP/SL tiers.
 
 import { InlineKeyboard } from 'grammy';
-import type { actions as actionsNs, schemas } from '@0xsyncroot/opentrade-core';
+import type { actions as actionsNs, schemas } from '@hiepht/opentrade-core';
 
 type Screen = schemas.Screen;
 type Block = schemas.Block;

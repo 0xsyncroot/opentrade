@@ -1,9 +1,9 @@
 // `opentrade quote <chain> <token> <amount>`
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import { nativeAmountToWei } from '@0xsyncroot/opentrade-core/chains';
-import { quote } from '@0xsyncroot/opentrade-core/gmgn';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import { nativeAmountToWei } from '@hiepht/opentrade-core/chains';
+import { quote } from '@hiepht/opentrade-core/gmgn';
 import { bootstrap, exitWithError, flag, parseChainArg } from './_shared.js';
 import { emitJson, renderKv } from '../render/cli-renderer.js';
 import { walletFor } from '../config/wallets.js';

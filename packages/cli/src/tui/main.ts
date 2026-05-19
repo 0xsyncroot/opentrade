@@ -15,8 +15,8 @@ import process from 'node:process';
 import React from 'react';
 import { render } from 'ink';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { gmgn } from '@0xsyncroot/opentrade-core';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
+import { gmgn } from '@hiepht/opentrade-core';
+import type { Chain } from '@hiepht/opentrade-core/chains';
 import { App } from './App.js';
 import {
   ConfigError,

@@ -1,7 +1,7 @@
 {
-  "name": "@0xsyncroot/opentrade",
-  "version": "0.0.1",
-  "description": "Fast GMGN trading CLI — interactive TUI (React + Ink) + non-interactive subcommands. Base / Solana / ETH / BSC.",
+  "name": "@hiepht/opentrade",
+  "version": "0.0.2",
+  "description": "Fast GMGN trading CLI — interactive TUI (React + Ink) + non-interactive subcommands + in-process Telegram bot. Base / Solana / ETH / BSC. Single install.",
   "type": "module",
   "bin": {
     "opentrade": "./bin/opentrade.mjs",
@@ -22,21 +22,24 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.9.0",
-    "@0xsyncroot/opentrade-bot": "workspace:*",
-    "@0xsyncroot/opentrade-core": "workspace:*",
+    "@grammyjs/conversations": "^2.0.1",
     "@tanstack/react-query": "^5.62.16",
     "citty": "^0.1.6",
     "cli-table3": "^0.6.5",
     "consola": "^3.3.3",
     "cosmiconfig": "^9.0.0",
+    "grammy": "^1.32.0",
     "ink": "^5.1.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "react": "^18.3.1",
+    "undici": "^7.2.0",
     "zod": "^3.24.1",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@hiepht/opentrade-bot": "workspace:*",
+    "@hiepht/opentrade-core": "workspace:*",
     "@types/node": "^22.10.5",
     "@types/react": "^18.3.18",
     "ink-testing-library": "^4.0.0"
@@ -47,12 +50,23 @@
     "cli",
     "tui",
     "ink",
+    "telegram",
+    "bot",
     "solana",
     "base",
     "ethereum",
     "bsc",
-    "memecoin"
+    "memecoin",
+    "sniper"
   ],
+  "homepage": "https://github.com/0xsyncroot/opentrade#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0xsyncroot/opentrade.git"
+  },
+  "bugs": {
+    "url": "https://github.com/0xsyncroot/opentrade/issues"
+  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"

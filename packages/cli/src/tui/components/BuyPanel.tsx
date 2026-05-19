@@ -3,7 +3,7 @@
 
 import { Box, Text } from 'ink';
 import React from 'react';
-import type { ActionButton } from '@0xsyncroot/opentrade-core/schemas';
+import type { ActionButton } from '@hiepht/opentrade-core/schemas';
 import { actionTone, theme } from '../theme.js';
 
 export interface BuyPanelProps {

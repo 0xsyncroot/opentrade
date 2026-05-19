@@ -5,7 +5,7 @@
 
 import { Box, Text } from 'ink';
 import React from 'react';
-import type { Screen } from '@0xsyncroot/opentrade-core/schemas';
+import type { Screen } from '@hiepht/opentrade-core/schemas';
 import { renderBlocks } from '../render/InkRenderer.js';
 import { theme } from '../theme.js';
 

@@ -1,8 +1,8 @@
 // `opentrade holdings <chain>` — alias of `ps --chain ...`
 
 import { defineCommand } from 'citty';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
-import { listHoldings } from '@0xsyncroot/opentrade-core/services';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import { listHoldings } from '@hiepht/opentrade-core/services';
 import { bootstrap, exitWithError, flag, parseChainArg } from './_shared.js';
 import { emitJson, renderTable } from '../render/cli-renderer.js';
 import { walletFor } from '../config/wallets.js';

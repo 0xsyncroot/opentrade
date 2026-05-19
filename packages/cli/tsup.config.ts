@@ -8,16 +8,20 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   target: 'node20',
-  // Keep every package resolvable from node_modules — Ink + React must NOT be
-  // bundled (they assume singleton instances), and our @0xsyncroot/opentrade-core
-  // dist is already published as ESM. Leaving everything external also slashes
-  // build time and lets us mock modules in tests.
+  // Workspace siblings — bundle them INTO the cli dist so end-users get
+  // everything from one `npm i @hiepht/opentrade`. The bot + core source lives
+  // in private packages that never reach the npm registry.
+  noExternal: [/^@hiepht\/opentrade/],
+  // Runtime deps that must remain external (loaded from node_modules at run
+  // time): React + Ink (singleton constraint), grammY (telegram), undici
+  // (fetch), and the various UI/parser libs we depend on.
   external: [
     /^react($|\/)/,
     /^ink($|-)/,
     'react-devtools-core',
-    /^@0xsyncroot\/opentrade/,
     /^@tanstack\//,
+    /^@grammyjs\//,
+    'grammy',
     'zustand',
     'zod',
     'undici',

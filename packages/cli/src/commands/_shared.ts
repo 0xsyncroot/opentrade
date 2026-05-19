@@ -1,9 +1,9 @@
 // Helpers shared by all subcommands: client construction, dispatcher context,
 // flag parsers, common error/exit conventions.
 
-import { GmgnClient } from '@0xsyncroot/opentrade-core/gmgn';
-import type { DispatcherContext } from '@0xsyncroot/opentrade-core/actions';
-import type { Chain } from '@0xsyncroot/opentrade-core/chains';
+import { GmgnClient } from '@hiepht/opentrade-core/gmgn';
+import type { DispatcherContext } from '@hiepht/opentrade-core/actions';
+import type { Chain } from '@hiepht/opentrade-core/chains';
 import { loadConfig, type LoadedConfig } from '../config/load.js';
 import { makeRecorder } from '../audit/trade-log.js';
 import { color, log } from '../render/cli-renderer.js';

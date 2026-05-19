@@ -3,7 +3,7 @@
 
 import { Box, Text } from 'ink';
 import React, { useMemo } from 'react';
-import { classifier } from '@0xsyncroot/opentrade-core';
+import { classifier } from '@hiepht/opentrade-core';
 import { theme } from '../theme.js';
 
 const { SLASH_COMMANDS_HELP } = classifier;

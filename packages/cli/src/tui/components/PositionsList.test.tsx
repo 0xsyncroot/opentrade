@@ -3,7 +3,7 @@
 import { render } from 'ink-testing-library';
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import type { Holding } from '@0xsyncroot/opentrade-core/gmgn';
+import type { Holding } from '@hiepht/opentrade-core/gmgn';
 import { PositionsList } from './PositionsList.js';
 
 const sample: Holding[] = [
