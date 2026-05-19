@@ -103,13 +103,24 @@ export const botCmd = defineCommand({
         process.on('SIGINT', () => void stop('SIGINT'));
         process.on('SIGTERM', () => void stop('SIGTERM'));
 
-        // Keep the loop alive — bot.start() returns a promise that resolves
-        // when the bot stops; we await it so the process exits cleanly when
-        // the bot ever stops on its own.
-        await new Promise<void>(() => {
-          // never resolves; SIGTERM / SIGINT handler exits the process.
+        // P1-G: keep the loop alive UNTIL either SIGTERM (handled above) OR
+        // the bot reports an unexpected status. If grammY's polling crashes
+        // internally, handle.onStatusChange fires 'error'/'off' — we MUST
+        // exit non-zero so systemd / docker / pm2 can detect the death and
+        // restart us. The previous `new Promise<void>(() => {})` deadlocked
+        // forever in that scenario.
+        await new Promise<void>((resolve) => {
+          const unsub = handle!.onStatusChange?.((s) => {
+            if (shuttingDown) return;
+            if (s === 'error' || s === 'off') {
+              process.stderr.write(`[bot] unexpected status '${s}' — exiting for supervisor restart\n`);
+              try { unsub?.(); } catch { /* */ }
+              try { fs.unlinkSync(paths.botPidFile); } catch { /* */ }
+              resolve();
+            }
+          });
         });
-        return;
+        process.exit(1);
       }
       case 'stop': {
         if (!existsPid(paths.botPidFile)) {

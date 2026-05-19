@@ -62,6 +62,12 @@ export interface TuiState {
   historyIndex: number;
   /** Race-safe fetch sequence number. */
   inflightSeq: number;
+  /**
+   * Telegram-bot-pushed trade event counter. Bumped whenever the bot's
+   * `BotEventStore.pushTradeEvent()` fires. Polling hooks subscribe so a phone
+   * trade triggers an immediate holdings refetch in the TUI (P1-C).
+   */
+  tradeEventNonce: number;
   /** Is the user actively typing? Pauses background polling. */
   isTyping: boolean;
   /** Last UI status (one-line ribbon under the input). */
@@ -88,6 +94,7 @@ export interface TuiState {
   pushHistory: (entry: string) => void;
   setHistoryIndex: (i: number) => void;
   bumpInflight: () => number;
+  bumpTradeEvent: () => void;
   setTyping: (b: boolean) => void;
   setStatus: (msg: string | undefined, tone?: 'info' | 'warn' | 'error' | 'success') => void;
   setBot: (s: { status?: BotStatus; error?: string | undefined; handle?: BotHandle | undefined }) => void;
@@ -111,6 +118,7 @@ export const useTuiStore = create<TuiState>((set, _get) => ({
   inputHistory: [],
   historyIndex: -1,
   inflightSeq: 0,
+  tradeEventNonce: 0,
   isTyping: false,
   statusMessage: undefined,
   statusTone: undefined,
@@ -167,6 +175,7 @@ export const useTuiStore = create<TuiState>((set, _get) => ({
     });
     return seq;
   },
+  bumpTradeEvent: () => set((s) => ({ tradeEventNonce: s.tradeEventNonce + 1 })),
   setTyping: (b) => set({ isTyping: b }),
   setStatus: (msg, tone) => set({ statusMessage: msg, statusTone: tone }),
   setBot: (s) =>

@@ -86,24 +86,49 @@ export async function startBotIfConfigured(args: {
   const wallets = (args.config.wallets ?? {}) as Partial<Record<Chain, string>>;
   const defaultChain: Chain = (args.config.defaultChain ?? 'base') as Chain;
 
+  // P1-C: adapter mapping bot's BotEventStore.pushTradeEvent → zustand
+  // tradeEventNonce bump. Polling hooks subscribe to tradeEventNonce so a
+  // Telegram trade triggers an immediate holdings refetch in the TUI.
+  // Event shape from packages/bot/src/start.ts:33 (TradeEvent).
+  const eventStoreAdapter = {
+    pushTradeEvent: (_event: { intent: unknown; result?: unknown; timestampUtc: string }) => {
+      args.store.setState((s) => ({
+        tradeEventNonce: (s.tradeEventNonce ?? 0) + 1,
+      }));
+    },
+  };
+
   try {
-    const handle = await botModule.startBot({
+    const rawHandle = await botModule.startBot({
       telegramBotToken,
       telegramOwnerChatId: String(telegramOwnerChatId),
       dispatcherCtx: args.dispatcherCtx,
       wallets,
       defaultChain,
+      store: eventStoreAdapter,
     });
 
-    // P1-7 fix: subscribe to status changes so the StatusBar reflects the
-    // bot's actual state (including async errors that happen AFTER startBot
-    // returns successfully). Without this, a polling crash inside grammy is
-    // only visible via the bus internal state.
-    handle.onStatusChange((s) => {
-      // Map BotStatus from start.ts (off/starting/connected/error) directly
-      // — the union types are identical.
+    // P1-B fix: capture the unsubscribe handle from onStatusChange so the
+    // listener is torn down when the bot stops. Without this, each T-toggle
+    // cycle leaks a listener and produces duplicate setBot() calls.
+    const unsubStatus = rawHandle.onStatusChange((s) => {
+      // BotStatus union from start.ts maps directly to the TUI store union.
       args.setBot({ status: s });
     });
+
+    // Wrap stop() so callers (TUI quit / T-toggle / stopBotSafely) clean up
+    // the status listener as part of the stop flow.
+    const handle: BotHandle = {
+      ...rawHandle,
+      stop: async () => {
+        try {
+          unsubStatus();
+        } catch {
+          /* */
+        }
+        await rawHandle.stop();
+      },
+    };
 
     args.setBot({ status: 'connected', error: undefined, handle });
     return handle;

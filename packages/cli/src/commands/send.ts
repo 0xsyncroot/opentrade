@@ -44,6 +44,30 @@ export const sendCmd = defineCommand({
     const wallet = walletFor(ctx.loaded.config, chain);
     if (!wallet) exitWithError(`no wallet for chain '${chain}'`);
 
+    // P1-E: every send attempt — including cancellations and the unimplemented
+    // v1 stub — must write to the audit ledger. Build a partial intent we can
+    // record even before all validation passes.
+    const auditAndExit = async (reason: string, code = 1): Promise<never> => {
+      try {
+        const partialIntent: SendIntent = {
+          kind: 'send',
+          chain,
+          token: NATIVE_INPUT_TOKEN[chain],
+          amountWei: '0',
+          to: typeof args.to === 'string' ? args.to : '',
+        };
+        await ctx.dispatcherCtx.recordTrade?.({
+          kind: 'send',
+          intent: partialIntent,
+          error: { message: reason },
+          timestampUtc: new Date().toISOString(),
+        });
+      } catch {
+        /* audit failure must not block exit */
+      }
+      process.exit(code);
+    };
+
     // Resolve destination (alias or raw address)
     const ab = readAddressBook(ctx.loaded.paths);
     let destination: string | undefined;
@@ -51,22 +75,34 @@ export const sendCmd = defineCommand({
     if (args.to.startsWith('@')) {
       const alias = args.to.slice(1);
       abEntry = ab.entries.find((e) => e.alias === alias && e.chain === chain);
-      if (!abEntry) exitWithError(`alias not found in address book: @${alias} (chain=${chain})`);
-      destination = abEntry.address;
+      if (!abEntry) {
+        log.error(color.red(`alias not found in address book: @${alias} (chain=${chain})`));
+        await auditAndExit(`alias not found: @${alias}`);
+      }
+      destination = abEntry!.address;
     } else {
       destination = args.to;
       abEntry = ab.entries.find((e) => e.address.toLowerCase() === args.to.toLowerCase() && e.chain === chain);
     }
 
     // Validate format
-    if (isEvmChain(chain) && !EVM_RE.test(destination!)) exitWithError(`destination is not a valid ${chain} address`);
-    if (chain === 'sol' && !SOL_RE.test(destination!)) exitWithError('destination is not a valid Solana address');
+    if (isEvmChain(chain) && !EVM_RE.test(destination!)) {
+      log.error(color.red(`destination is not a valid ${chain} address`));
+      await auditAndExit(`invalid ${chain} address: ${destination}`);
+    }
+    if (chain === 'sol' && !SOL_RE.test(destination!)) {
+      log.error(color.red('destination is not a valid Solana address'));
+      await auditAndExit('invalid Solana address');
+    }
 
     // Whitelist-only check
     if (ctx.loaded.config.whitelistOnly && !(abEntry && abEntry.whitelisted)) {
-      exitWithError(
-        `config.whitelistOnly=true — destination must be a whitelisted address-book entry. Add with: opentrade ab add ${chain} <alias> ${destination}`,
+      log.error(
+        color.red(
+          `config.whitelistOnly=true — destination must be a whitelisted address-book entry. Add with: opentrade ab add ${chain} <alias> ${destination}`,
+        ),
       );
+      await auditAndExit('whitelist-only mode — destination not whitelisted');
     }
 
     // First-time-address protocol
@@ -75,7 +111,7 @@ export const sendCmd = defineCommand({
         `${color.yellow('!')} first-time send to this address. Add it to the address book first: opentrade ab add ${chain} <alias> ${destination}`,
       );
       if (!flag(args as Record<string, unknown>, 'dry-run') && !flag(args as Record<string, unknown>, 'yes')) {
-        process.exit(2);
+        await auditAndExit('first-time-address — must add to address book first', 2);
       }
     } else {
       const ageSec = (Date.now() - Date.parse(abEntry.addedAtUtc)) / 1000;
@@ -83,10 +119,13 @@ export const sendCmd = defineCommand({
         log.warn(
           `${color.yellow('!')} address added ${ageSec.toFixed(0)}s ago — 60s cooldown active. Wait before sending.`,
         );
-        if (!flag(args as Record<string, unknown>, 'dry-run')) process.exit(2);
+        if (!flag(args as Record<string, unknown>, 'dry-run')) {
+          await auditAndExit(`address cooldown active (${ageSec.toFixed(0)}s of 60s)`, 2);
+        }
       }
       if (abEntry.isContract && !flag(args as Record<string, unknown>, 'allow-contract')) {
-        exitWithError('address-book entry marked as contract — pass --allow-contract to send');
+        log.error(color.red('address-book entry marked as contract — pass --allow-contract to send'));
+        await auditAndExit('contract address — --allow-contract required');
       }
     }
 
@@ -122,14 +161,30 @@ export const sendCmd = defineCommand({
     });
     if (!ok) {
       log.warn('cancelled');
+      try {
+        await ctx.dispatcherCtx.recordTrade?.({
+          kind: 'send',
+          intent,
+          error: { message: 'cancelled at confirmation prompt' },
+          timestampUtc: new Date().toISOString(),
+        });
+      } catch { /* */ }
       process.exit(1);
     }
 
     // v1: the actual native transfer requires a signer; core service throws a
-    // descriptive error. Surface it.
+    // descriptive error. Surface it AND audit the attempt.
     log.error(
       'send: native chain RPC transfer not yet wired in v1. Use a wallet UI for the final on-chain send, or wait for the viem/@solana/web3.js integration in a follow-up.',
     );
+    try {
+      await ctx.dispatcherCtx.recordTrade?.({
+        kind: 'send',
+        intent,
+        error: { message: 'unsigned send not implemented (v1 stub)' },
+        timestampUtc: new Date().toISOString(),
+      });
+    } catch { /* */ }
     process.exit(2);
   },
 });

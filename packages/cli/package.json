@@ -1,8 +1,11 @@
 {
   "name": "@hiepht/opentrade",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Fast GMGN trading CLI — interactive TUI (React + Ink) + non-interactive subcommands + in-process Telegram bot. Base / Solana / ETH / BSC. Single install.",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "bin": {
     "opentrade": "./bin/opentrade.mjs",
     "ot": "./bin/opentrade.mjs"

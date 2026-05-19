@@ -34,6 +34,14 @@ function appendBlock(filePath: string, header: string, body: string): void {
     ? ''
     : `# opentrade trades — ${path.basename(filePath, '.md').replace('trades_', '')}\n\n`;
   fs.appendFileSync(filePath, `${prelude}## ${header}\n${body}\n\n`, { mode: 0o600 });
+  // `appendFileSync({mode})` only applies on file CREATION — once the file
+  // exists subsequent appends keep whatever mode it already had (which may
+  // have been masked by umask). chmodSync guarantees 0o600 every time.
+  try {
+    fs.chmodSync(filePath, 0o600);
+  } catch {
+    /* tolerated — e.g. read-only mount */
+  }
 }
 
 function safeStringify(v: unknown): string {

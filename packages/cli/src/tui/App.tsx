@@ -16,7 +16,7 @@ import {
 } from '@hiepht/opentrade-core';
 import type { GmgnClient } from '@hiepht/opentrade-core/gmgn';
 import type { DispatcherContext } from '@hiepht/opentrade-core/actions';
-import type { Chain } from '@hiepht/opentrade-core/chains';
+import { NATIVE_INPUT_TOKEN, type Chain } from '@hiepht/opentrade-core/chains';
 import { classifier } from '@hiepht/opentrade-core';
 import type { Intent, Screen } from '@hiepht/opentrade-core/schemas';
 import { ConfirmModal, decideConfirmTier } from './components/ConfirmModal.js';
@@ -144,6 +144,7 @@ export const App: React.FC<AppProps> = (props) => {
     }
   }, [snapshotQuery.data, setCurrentToken]);
 
+  const tradeEventNonce = useTuiStore((s) => s.tradeEventNonce);
   const holdingsQuery = useHoldingsQuery({
     client,
     chain,
@@ -152,6 +153,8 @@ export const App: React.FC<AppProps> = (props) => {
     // an open confirm modal can't see the position size change mid-confirm.
     paused: isTyping || modalStack.length > 0 || slashOpen || testMode === true,
     intervalMs: view === 'positions' ? 5_000 : 10_000,
+    // P1-C: when bot reports a Telegram trade landed, force immediate refetch.
+    tradeEventNonce,
   });
   useEffect(() => {
     if (holdingsQuery.data) setHoldings(holdingsQuery.data);
@@ -196,11 +199,19 @@ export const App: React.FC<AppProps> = (props) => {
 
   // -- screen rebuild on (token + mode + holdings + chain) -----------------
   useEffect(() => {
+    // P1-D: derive native balance from existing holdings array. GMGN returns
+    // the native token (WETH on Base/ETH, SOL on Solana, BNB on BSC) inside
+    // the holdings list with token_address matching NATIVE_INPUT_TOKEN[chain].
+    // Avoids an extra poll endpoint while still surfacing live native balance.
+    const nativeAddr = NATIVE_INPUT_TOKEN[chain].toLowerCase();
+    const nativeHolding = holdings.find(
+      (h) => (h.token_address ?? '').toLowerCase() === nativeAddr,
+    );
     const header = buildHeader({
       chain,
       walletAddress,
-      nativeBalanceWei: undefined,
-      nativeBalanceUsd: undefined,
+      nativeBalanceWei: nativeHolding?.balance,
+      nativeBalanceUsd: nativeHolding?.usd_value,
       openPositions: holdings.length,
     });
     let screen: Screen;

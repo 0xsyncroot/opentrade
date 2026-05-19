@@ -4,6 +4,9 @@
   "private": true,
   "description": "Internal Telegram bot module for @hiepht/opentrade — not published, bundled into the CLI artifact at build time.",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./dist/main.js",
   "module": "./dist/main.js",
   "types": "./dist/start.d.ts",

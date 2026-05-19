@@ -53,9 +53,16 @@ export function useHoldingsQuery(args: {
   walletAddress: string;
   paused?: boolean;
   intervalMs?: number;
+  /**
+   * Bumped when the bot reports a Telegram trade landed (P1-C). Including it
+   * in the queryKey forces react-query to re-run the fetch immediately so the
+   * TUI holdings reflect the on-chain change without waiting for the next
+   * scheduled interval.
+   */
+  tradeEventNonce?: number;
 }) {
   return useQuery<Holding[]>({
-    queryKey: ['holdings', args.chain, args.walletAddress],
+    queryKey: ['holdings', args.chain, args.walletAddress, args.tradeEventNonce ?? 0],
     enabled: Boolean(args.client && args.walletAddress && !args.paused),
     refetchInterval: args.paused ? false : args.intervalMs ?? 10_000,
     queryFn: async () => {
