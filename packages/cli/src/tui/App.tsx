@@ -11,10 +11,11 @@ import { Box, Text, useApp, useInput } from 'ink';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   actions as actionsApi,
+  presets as presetsApi,
   services,
   views,
 } from '@hiepht/opentrade-core';
-import type { GmgnClient } from '@hiepht/opentrade-core/gmgn';
+import { GmgnError, type GmgnClient } from '@hiepht/opentrade-core/gmgn';
 import type { DispatcherContext } from '@hiepht/opentrade-core/actions';
 import { NATIVE_INPUT_TOKEN, type Chain } from '@hiepht/opentrade-core/chains';
 import { classifier } from '@hiepht/opentrade-core';
@@ -25,6 +26,7 @@ import { HelpOverlay } from './components/HelpOverlay.js';
 import { InfoExpanded } from './components/InfoExpanded.js';
 import { InputBar } from './components/InputBar.js';
 import { PositionsList } from './components/PositionsList.js';
+import { RecentOverlay } from './components/RecentOverlay.js';
 import { SlashPalette } from './components/SlashPalette.js';
 import { StatusBar } from './components/StatusBar.js';
 import { TokenCard } from './components/TokenCard.js';
@@ -40,11 +42,28 @@ import {
   stopBotSafely,
 } from './bot-lifecycle.js';
 import type { OpentradeConfig } from './hooks/useConfig.js';
+import { resolvePaths } from '../config/paths.js';
+import { scheduleSave } from './history-store.js';
 
 const { fetchTokenSnapshot, listHoldings } = services;
 const { buildBuyScreen, buildHeader, buildHomeScreen, buildInfoScreen, buildPositionsScreen, buildSellScreen } = views;
 const { parseSlash } = classifier;
 const { dispatch } = actionsApi;
+
+/**
+ * Convert a native amount (e.g. 0.05 ETH) into a wei-string suitable for
+ * BuyIntent.amountWei. Mirrors the private helper in core/views/index.ts so
+ * the slash `/buy` handler stays self-contained.
+ */
+function nativeToWeiString(chain: Chain, amountNative: number): string {
+  const [whole, frac = ''] = amountNative.toString().split('.');
+  const wholePart = BigInt(whole ?? '0');
+  const decimals = chain === 'sol' ? 9 : 18;
+  const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+  const fracPart = fracPadded ? BigInt(fracPadded) : 0n;
+  const total = wholePart * 10n ** BigInt(decimals) + fracPart;
+  return total.toString();
+}
 
 export interface AppProps {
   client: GmgnClient | undefined;
@@ -59,6 +78,17 @@ export interface AppProps {
   onIntent?: (intent: Intent) => void;
   /** Override fetch — testing only. */
   fetchSnapshotImpl?: typeof fetchTokenSnapshot;
+  /**
+   * Override the history file path. Tests pass a tmp file; production leaves
+   * undefined and we resolve via `resolvePaths().historyFile`.
+   */
+  historyFile?: string;
+  /**
+   * Disable the on-change history-save effect entirely. Tests that don't
+   * care about persistence pass true to avoid touching the user's real
+   * ~/.config/opentrade/history.json from a forked worker.
+   */
+  disableHistoryPersist?: boolean;
 }
 
 export const App: React.FC<AppProps> = (props) => {
@@ -99,11 +129,17 @@ export const App: React.FC<AppProps> = (props) => {
   const botStatus = useTuiStore((s) => s.botStatus);
   const botHandle = useTuiStore((s) => s.botHandle);
   const setBot = useTuiStore((s) => s.setBot);
+  const overrideRisky = useTuiStore((s) => s.overrideRisky);
+  const setOverrideRisky = useTuiStore((s) => s.setOverrideRisky);
+  const recentOverlayOpen = useTuiStore((s) => s.recentOverlayOpen);
+  const openRecentOverlay = useTuiStore((s) => s.openRecentOverlay);
+  const closeRecentOverlay = useTuiStore((s) => s.closeRecentOverlay);
 
   // Local UI state (not shared with bot).
   const [inputBuffer, setInputBuffer] = useState('');
   const [paletteCursor, setPaletteCursor] = useState(0);
   const [positionsCursor, setPositionsCursor] = useState(0);
+  const [recentCursor, setRecentCursor] = useState(0);
   const [view, setView] = useState<'home' | 'token' | 'info' | 'positions'>('home');
 
   const abortable = useAbortable();
@@ -130,13 +166,39 @@ export const App: React.FC<AppProps> = (props) => {
     typingTimer.current = setTimeout(() => setTyping(false), 1000);
   };
 
+  // -- persist input history on change (debounced 500ms) --------------------
+  // Subscribe to inputHistory; whenever it changes, schedule a write. The
+  // scheduleSave helper coalesces rapid mutations into a single fs write and
+  // uses atomic rename so a crash mid-write can't corrupt the file.
+  const resolvedHistoryFile = useMemo(() => {
+    if (props.historyFile) return props.historyFile;
+    if (props.disableHistoryPersist) return undefined;
+    try {
+      return resolvePaths().historyFile;
+    } catch {
+      return undefined;
+    }
+  }, [props.historyFile, props.disableHistoryPersist]);
+  const firstHistoryEffect = useRef(true);
+  useEffect(() => {
+    if (props.disableHistoryPersist) return;
+    if (!resolvedHistoryFile) return;
+    // Skip the first run so the freshly-loaded hydration doesn't trigger a
+    // write loop. We only persist user-driven additions.
+    if (firstHistoryEffect.current) {
+      firstHistoryEffect.current = false;
+      return;
+    }
+    scheduleSave(resolvedHistoryFile, inputHistory);
+  }, [inputHistory, resolvedHistoryFile, props.disableHistoryPersist]);
+
   // -- background polling ---------------------------------------------------
   const snapshotQuery = useTokenSnapshotQuery({
     client,
     chain,
     walletAddress,
     tokenAddress: currentTokenAddr,
-    paused: isTyping || modalStack.length > 0 || slashOpen || testMode === true,
+    paused: isTyping || modalStack.length > 0 || slashOpen || recentOverlayOpen || testMode === true,
   });
   useEffect(() => {
     if (snapshotQuery.data) {
@@ -151,7 +213,7 @@ export const App: React.FC<AppProps> = (props) => {
     walletAddress,
     // P1-12: pause holdings polling when ANY modal/slash overlay is open so
     // an open confirm modal can't see the position size change mid-confirm.
-    paused: isTyping || modalStack.length > 0 || slashOpen || testMode === true,
+    paused: isTyping || modalStack.length > 0 || slashOpen || recentOverlayOpen || testMode === true,
     intervalMs: view === 'positions' ? 5_000 : 10_000,
     // P1-C: when bot reports a Telegram trade landed, force immediate refetch.
     tradeEventNonce,
@@ -285,37 +347,220 @@ export const App: React.FC<AppProps> = (props) => {
       //      isStale(ticket) = true
       // Either way, swallow silently.
       if (signal.aborted || abortable.isStale(ticket)) return;
-      const msg = err instanceof Error ? err.message : String(err);
-      setStatus(`Fetch failed: ${msg.slice(0, 80)}`, 'error');
+      setStatus(formatFetchError(err), 'error');
     }
   };
 
   // -- slash command routing -----------------------------------------------
+  //
+  // Two patterns:
+  //   1. Execute in-TUI — stateful UI commands we can fully handle in-process
+  //      (buy, sell, wallet, risk, recent, chain, ps, info, help, quit).
+  //   2. Friendly shell hand-off — anything that needs persistent stdin
+  //      control (init wizard, keygen prompts) or streaming output (feed,
+  //      orders) prints the exact `opentrade <sub>` invocation to the status
+  //      ribbon so the user can copy-paste it into another shell.
+  //
+  // All status writes go to the ribbon (setStatus) — never a modal — so the
+  // user can dismiss simply by typing the next thing.
   const handleSlashCommand = (raw: string) => {
     const cmd = parseSlash(raw);
     closeSlash();
     setInputBuffer('');
     switch (cmd.cmd) {
+      // -- in-TUI ----------------------------------------------------------
       case 'chain': {
-        const c = cmd.args[0] as Chain | undefined;
-        if (c && ['base', 'sol', 'eth', 'bsc'].includes(c)) setChain(c);
-        break;
+        const c = cmd.args[0]?.toLowerCase() as Chain | undefined;
+        if (c && ['base', 'sol', 'eth', 'bsc'].includes(c)) {
+          setChain(c);
+          setStatus(`Chain switched to ${c}.`, 'success');
+        } else {
+          setStatus('Usage: /chain base|sol|eth|bsc', 'warn');
+        }
+        return;
       }
       case 'ps':
         setView('positions');
-        break;
+        return;
+      case 'wallet':
+        setView('positions');
+        return;
       case 'info':
-        if (currentToken) setView('info');
-        break;
+        if (currentToken) {
+          setView('info');
+        } else {
+          setStatus('No token loaded — paste a CA first.', 'warn');
+        }
+        return;
       case 'help':
         openHelp();
-        break;
+        return;
       case 'quit':
         void teardownAndExit();
-        break;
+        return;
+      case 'recent': {
+        if (inputHistory.length === 0) {
+          setStatus('No recent inputs yet — paste a CA first.', 'info');
+          return;
+        }
+        openRecentOverlay();
+        return;
+      }
+      case 'risk': {
+        const arg = cmd.args[0]?.toLowerCase();
+        if (arg === 'allow') {
+          setOverrideRisky(true);
+          setStatus('Risky-token override: ON (this session). Use /risk deny to revoke.', 'warn');
+        } else if (arg === 'deny') {
+          setOverrideRisky(false);
+          setStatus('Risky-token override: OFF.', 'info');
+        } else {
+          setStatus(
+            `Risky-token override is ${overrideRisky ? 'ON' : 'OFF'}. Usage: /risk allow|deny`,
+            'info',
+          );
+        }
+        return;
+      }
+      case 'buy': {
+        const amountStr = cmd.args[0];
+        if (!amountStr) {
+          setStatus('Usage: /buy <amount>  (e.g. /buy 0.05)', 'warn');
+          return;
+        }
+        const amount = Number(amountStr);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          setStatus(`Invalid amount: ${amountStr}`, 'error');
+          return;
+        }
+        if (!currentToken) {
+          setStatus('No token loaded — paste a CA before /buy.', 'warn');
+          return;
+        }
+        const preset = presetsApi.DEFAULT_PRESETS[chain];
+        const intent: Intent = {
+          kind: 'buy',
+          chain,
+          token: currentToken.token.address,
+          amountWei: nativeToWeiString(chain, amount),
+          slippageBps: preset.slippageBps,
+          antiMev: preset.antiMev,
+        };
+        void runIntent(intent);
+        return;
+      }
+      case 'sell': {
+        const pctStr = cmd.args[0];
+        if (!pctStr) {
+          setStatus('Usage: /sell <percent>  (e.g. /sell 50)', 'warn');
+          return;
+        }
+        const pct = Number(pctStr);
+        if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+          setStatus(`Invalid percent: ${pctStr} (1-100)`, 'error');
+          return;
+        }
+        if (!currentToken) {
+          setStatus('No token loaded — paste a CA before /sell.', 'warn');
+          return;
+        }
+        if (!currentToken.myHolding) {
+          setStatus(`No holding for ${currentToken.token.symbol}.`, 'warn');
+          return;
+        }
+        const preset = presetsApi.DEFAULT_PRESETS[chain];
+        const intent: Intent = {
+          kind: 'sell',
+          chain,
+          token: currentToken.token.address,
+          percent: Math.round(pct),
+          slippageBps: preset.slippageBps,
+          antiMev: 'auto',
+        };
+        void runIntent(intent);
+        return;
+      }
+
+      // -- friendly shell hand-offs ----------------------------------------
+      case 'init':
+        setStatus(
+          'Run in a new shell: `opentrade init` — interactive wizard needs full stdin. Press q to exit this TUI first.',
+          'info',
+        );
+        return;
+      case 'keygen':
+        setStatus(
+          'Run in a new shell: `opentrade keygen` — writes ~/.config/opentrade/secrets/ed25519.pem.',
+          'info',
+        );
+        return;
+      case 'config': {
+        const sub = cmd.args[0]?.toLowerCase();
+        const tail = cmd.args.slice(1).join(' ');
+        setStatus(
+          `Run in a new shell: \`opentrade config ${sub ?? 'show'}${tail ? ` ${tail}` : ''}\`.`,
+          'info',
+        );
+        return;
+      }
+      case 'feed': {
+        const kind = cmd.args[0] ?? 'trending';
+        setStatus(
+          `Run in a new shell: \`opentrade feed ${kind} --chain ${chain}\` — streaming feeds need a dedicated terminal.`,
+          'info',
+        );
+        return;
+      }
+      case 'orders': {
+        const op = cmd.args[0] ?? 'list';
+        const id = cmd.args[1] ?? '';
+        setStatus(
+          `Run in a new shell: \`opentrade orders ${op}${id ? ` ${id}` : ''} --chain ${chain}\`.`,
+          'info',
+        );
+        return;
+      }
+      case 'limit': {
+        const side = cmd.args[0] ?? 'buy';
+        const price = cmd.args[1] ?? '<price>';
+        setStatus(
+          `Limit orders coming soon. For now: \`opentrade limit ${side} ${price} --chain ${chain}\` (early-gated).`,
+          'info',
+        );
+        return;
+      }
+      case 'send': {
+        const amount = cmd.args[0] ?? '<amount>';
+        const to = cmd.args[1] ?? '<to|@alias>';
+        setStatus(
+          `Run in a new shell: \`opentrade send ${amount} ${to} --chain ${chain}\`.`,
+          'info',
+        );
+        return;
+      }
+      case 'ab': {
+        const op = cmd.args[0] ?? 'ls';
+        const rest = cmd.args.slice(1).join(' ');
+        setStatus(
+          `Run in a new shell: \`opentrade ab ${op}${rest ? ` ${rest}` : ''}\` (address book lives in ~/.config/opentrade/address-book.json).`,
+          'info',
+        );
+        return;
+      }
+      case 'alias': {
+        const op = cmd.args[0] ?? 'ls';
+        const rest = cmd.args.slice(1).join(' ');
+        setStatus(
+          `Run in a new shell: \`opentrade alias ${op}${rest ? ` ${rest}` : ''}\`.`,
+          'info',
+        );
+        return;
+      }
+
+      // Unknown / unreachable.
       default:
-        setStatus(`Slash command /${cmd.cmd} runs via subcommand path (Phase 2).`, 'info');
-        break;
+        setStatus(`Unknown slash command: /${(cmd as { cmd: string }).cmd}`, 'warn');
+        return;
     }
   };
 
@@ -378,7 +623,12 @@ export const App: React.FC<AppProps> = (props) => {
       intent,
       walletUsd,
       tradeUsd,
-      safetyWarn: currentToken?.safety.warn === true,
+      // `/risk allow` (overrideRisky=true) suppresses the safety-warn tier
+      // bump for the duration of the session. This is the TUI equivalent of
+      // the `--allow-risky` CLI flag — it does NOT bypass dispatcher-side
+      // hard blocks (those still fire and surface "Blocked: ..." in the
+      // status ribbon), only the extra confirmation friction.
+      safetyWarn: currentToken?.safety.warn === true && !overrideRisky,
     });
     if (tier === 'T0') {
       void doDispatch(intent);
@@ -490,7 +740,10 @@ export const App: React.FC<AppProps> = (props) => {
     const evt = mapHotkey(input, key, {
       inputBufferLength: inputBuffer.length,
       modalOpen: modalStack.length > 0,
-      slashOpen,
+      // Recent overlay owns input the same way slash palette does — gate
+      // letter/digit hotkeys so typing while overlay is open doesn't trigger
+      // force_buy / refresh / etc.
+      slashOpen: slashOpen || recentOverlayOpen,
     });
     if (!evt) return false;
 
@@ -539,6 +792,36 @@ export const App: React.FC<AppProps> = (props) => {
         setPaletteCursor((c) => Math.max(0, c - 1));
         return true;
       }
+    }
+
+    if (recentOverlayOpen) {
+      const limit = Math.min(10, inputHistory.length);
+      if (evt.kind === 'escape') {
+        closeRecentOverlay();
+        setRecentCursor(0);
+        return true;
+      }
+      if (evt.kind === 'submit') {
+        // Recent overlay renders newest-first, so reverse-slice mirrors that.
+        const recent = inputHistory.slice(-10).reverse();
+        const picked = recent[recentCursor];
+        closeRecentOverlay();
+        setRecentCursor(0);
+        if (picked) {
+          setInputBuffer(picked);
+        }
+        return true;
+      }
+      if (evt.kind === 'list_down') {
+        setRecentCursor((c) => Math.min(Math.max(0, limit - 1), c + 1));
+        return true;
+      }
+      if (evt.kind === 'list_up') {
+        setRecentCursor((c) => Math.max(0, c - 1));
+        return true;
+      }
+      // Swallow everything else while overlay is open.
+      return true;
     }
 
     if (helpOpen) {
@@ -680,6 +963,12 @@ export const App: React.FC<AppProps> = (props) => {
         </Box>
       ) : null}
 
+      {recentOverlayOpen ? (
+        <Box marginTop={1}>
+          <RecentOverlay entries={inputHistory} cursor={recentCursor} />
+        </Box>
+      ) : null}
+
       {helpOpen ? (
         <Box marginTop={1}>
           <HelpOverlay />
@@ -697,6 +986,7 @@ export const App: React.FC<AppProps> = (props) => {
         statusMessage={statusMessage}
         statusTone={statusTone}
         typing={inputBuffer.length > 0}
+        slashOpen={slashOpen}
       />
 
       <InputBar
@@ -716,6 +1006,37 @@ export const App: React.FC<AppProps> = (props) => {
     </Box>
   );
 };
+
+/**
+ * Translate a fetch error into something a human can act on. The previous
+ * `msg.slice(0, 80)` swallowed the HTTP status + body and left the user
+ * with just the URL — leading to the bug report "cho xem luôn lỗi gì nhé"
+ * (show me what the actual error is).
+ *
+ * GmgnError carries `status` (HTTP code) and `body` (first 300 chars of the
+ * response). We map common statuses to a one-line hint, then append the
+ * raw GMGN body so the full picture is on screen. Network errors (no
+ * `instanceof GmgnError`) fall through to the bare message.
+ */
+function formatFetchError(err: unknown): string {
+  if (err instanceof GmgnError) {
+    const hint = httpStatusHint(err.status);
+    const body = err.body.replace(/\s+/g, ' ').slice(0, 200);
+    return `Fetch failed: HTTP ${err.status} ${hint} · ${err.subPath} · body=${body}`;
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  // Network / abort / timeout — show full message (no truncation).
+  return `Fetch failed: ${msg}`;
+}
+
+function httpStatusHint(status: number): string {
+  if (status === 401 || status === 403)
+    return '— GMGN rejected the API key. Re-paste it via `opentrade config set gmgn.apiKey <key>`.';
+  if (status === 404) return '— token not found on this chain. Try `/chain` to switch.';
+  if (status === 429) return '— rate-limited. Wait a few seconds and retry.';
+  if (status >= 500) return '— GMGN backend error. Check status.gmgn.ai or retry.';
+  return '';
+}
 
 // -- a thin top-level wrapper that also registers a Ctrl+C handler at the Ink
 //    layer (in addition to mapHotkey's `Ctrl+C` branch), since `exitOnCtrlC`

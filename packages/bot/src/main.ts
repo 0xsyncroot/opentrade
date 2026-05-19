@@ -14,8 +14,10 @@ Env vars:
   TELEGRAM_BOT_TOKEN        bot token from @BotFather
   TELEGRAM_OWNER_CHAT_ID    numeric chat_id (single-owner whitelist)
   GMGN_API_KEY              GMGN API key
-  GMGN_ED25519_PRIVATE_KEY_PATH   path to PEM (fallback: ~/.config/opentrade/secrets/ed25519.pem
-                                    then /root/develop/auto-trading/secrets/gmgn_ed25519.pem)
+  GMGN_ED25519_PRIVATE_KEY_PATH   path to PEM
+                                    (fallback: ~/.config/opentrade/secrets/ed25519.pem,
+                                    then <auto-trading-workspace>/secrets/gmgn_ed25519.pem
+                                    if detected on the parent directory tree)
   GMGN_WALLET_ADDRESS / WALLET_BASE / WALLET_ETH / WALLET_BSC / WALLET_SOL
   BOT_MODE                  polling (default) | webhook
   BOT_PORT                  webhook port (default 8080)
@@ -24,9 +26,9 @@ Subcommands:
   opentrade-bot --help      this message
 
 Outputs:
-  Trades to ~/.config/opentrade/trades_<UTC-date>.md (always) and
-  /root/develop/auto-trading/memory/agents/executor/trades_<UTC-date>.md
-  (mirror, only if that path exists).
+  Trades to ~/.config/opentrade/trades_<UTC-date>.md (always); also mirrored to
+  <auto-trading-workspace>/memory/agents/executor/trades_<UTC-date>.md when a
+  parent 'auto-trading/' workspace is detected at runtime.
 `;
 
 async function main(): Promise<void> {

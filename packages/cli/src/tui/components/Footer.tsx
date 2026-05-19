@@ -15,11 +15,18 @@ export interface FooterProps {
   statusTone?: 'info' | 'warn' | 'error' | 'success';
   /** When true, the user is composing input — show "Enter submit · Esc clear". */
   typing?: boolean;
+  /**
+   * True while the slash palette is open. We replace the generic typing hint
+   * with the 3-4 most-useful slash commands so a new user can discover the
+   * UX without leaving the palette to /help first.
+   */
+  slashOpen?: boolean;
 }
 
 const TYPING_HINT = 'Enter submit · Esc clear · paste CA to load · ↑/↓ history (empty buffer)';
+const SLASH_HINT = 'Try /buy <amt> · /sell <pct> · /chain base|sol|eth|bsc · /ps · /help for all';
 
-export const Footer: React.FC<FooterProps> = ({ hints, statusMessage, statusTone, typing }) => {
+export const Footer: React.FC<FooterProps> = ({ hints, statusMessage, statusTone, typing, slashOpen }) => {
   const toneColor =
     statusTone === 'error'
       ? theme.danger
@@ -28,7 +35,11 @@ export const Footer: React.FC<FooterProps> = ({ hints, statusMessage, statusTone
         : statusTone === 'success'
           ? theme.safe
           : theme.text;
-  const rows: string[] = typing ? [TYPING_HINT] : hints ?? [];
+  const rows: string[] = slashOpen
+    ? [SLASH_HINT]
+    : typing
+      ? [TYPING_HINT]
+      : hints ?? [];
   return (
     <Box flexDirection="column" paddingX={1}>
       {statusMessage ? (

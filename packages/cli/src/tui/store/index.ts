@@ -63,6 +63,17 @@ export interface TuiState {
   /** Race-safe fetch sequence number. */
   inflightSeq: number;
   /**
+   * Session override that lets the user bypass safety blocks for the next
+   * trade dispatch (mirrors `--allow-risky` on the CLI). Toggled by
+   * `/risk allow` / `/risk deny`. Defaults to false.
+   */
+  overrideRisky: boolean;
+  /**
+   * When non-empty, the input bar overlay shows a one-shot "recent inputs"
+   * picker. Entry click → load into buffer. Cleared by Esc or selection.
+   */
+  recentOverlayOpen: boolean;
+  /**
    * Telegram-bot-pushed trade event counter. Bumped whenever the bot's
    * `BotEventStore.pushTradeEvent()` fires. Polling hooks subscribe so a phone
    * trade triggers an immediate holdings refetch in the TUI (P1-C).
@@ -93,6 +104,11 @@ export interface TuiState {
   popModal: () => void;
   pushHistory: (entry: string) => void;
   setHistoryIndex: (i: number) => void;
+  /** Replace the entire history (used by the file-loader on startup). */
+  setHistory: (entries: string[]) => void;
+  setOverrideRisky: (b: boolean) => void;
+  openRecentOverlay: () => void;
+  closeRecentOverlay: () => void;
   bumpInflight: () => number;
   bumpTradeEvent: () => void;
   setTyping: (b: boolean) => void;
@@ -118,6 +134,8 @@ export const useTuiStore = create<TuiState>((set, _get) => ({
   inputHistory: [],
   historyIndex: -1,
   inflightSeq: 0,
+  overrideRisky: false,
+  recentOverlayOpen: false,
   tradeEventNonce: 0,
   isTyping: false,
   statusMessage: undefined,
@@ -167,6 +185,17 @@ export const useTuiStore = create<TuiState>((set, _get) => ({
       return { inputHistory: next, historyIndex: -1 };
     }),
   setHistoryIndex: (i) => set({ historyIndex: i }),
+  setHistory: (entries) =>
+    set({
+      // Defensive: cap + dedupe consecutive duplicates same as pushHistory.
+      inputHistory: entries
+        .filter((e, i, arr) => e && e !== arr[i - 1])
+        .slice(-50),
+      historyIndex: -1,
+    }),
+  setOverrideRisky: (b) => set({ overrideRisky: b }),
+  openRecentOverlay: () => set({ recentOverlayOpen: true }),
+  closeRecentOverlay: () => set({ recentOverlayOpen: false }),
   bumpInflight: () => {
     let seq = 0;
     set((s) => {

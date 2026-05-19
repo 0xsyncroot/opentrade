@@ -109,4 +109,32 @@ describe('useTuiStore', () => {
     expect(hist[hist.length - 1]).toBe('ca-10');
     expect(hist.filter((e) => e === 'ca-10').length).toBe(1);
   });
+
+  it('setHistory replaces the array, dedupes consecutive duplicates, caps at 50', () => {
+    const s = useTuiStore.getState();
+    s.setHistory(['a', 'a', 'b', 'b', 'b', 'c']);
+    expect(useTuiStore.getState().inputHistory).toEqual(['a', 'b', 'c']);
+    s.setHistory(Array.from({ length: 60 }, (_, i) => `x${i}`));
+    expect(useTuiStore.getState().inputHistory.length).toBe(50);
+    // setHistory also resets the navigation cursor.
+    expect(useTuiStore.getState().historyIndex).toBe(-1);
+  });
+
+  it('setOverrideRisky toggles the session-only allow-risky flag', () => {
+    const s = useTuiStore.getState();
+    expect(useTuiStore.getState().overrideRisky).toBe(false);
+    s.setOverrideRisky(true);
+    expect(useTuiStore.getState().overrideRisky).toBe(true);
+    s.setOverrideRisky(false);
+    expect(useTuiStore.getState().overrideRisky).toBe(false);
+  });
+
+  it('openRecentOverlay / closeRecentOverlay flip the boolean', () => {
+    const s = useTuiStore.getState();
+    expect(useTuiStore.getState().recentOverlayOpen).toBe(false);
+    s.openRecentOverlay();
+    expect(useTuiStore.getState().recentOverlayOpen).toBe(true);
+    s.closeRecentOverlay();
+    expect(useTuiStore.getState().recentOverlayOpen).toBe(false);
+  });
 });

@@ -4,19 +4,42 @@
 // Hard rule (CLAUDE.md "Inter-agent communication contract"):
 //   every trade attempt (success, fail, expired) writes to trades_<UTC-date>.md.
 //
-// We write to two locations when running inside the auto-trading workspace:
+// We write to two locations:
 //   1) ~/.config/opentrade/trades_<date>.md  (always)
-//   2) /root/develop/auto-trading/memory/agents/executor/trades_<date>.md
-//      (only if that directory exists — keeps the bot portable outside the
-//      workspace, e.g. on a bare VPS)
+//   2) <workspace>/memory/agents/executor/trades_<date>.md
+//      Only when a parent `auto-trading/` workspace is detected at runtime —
+//      end users installing from npm never see the mirror. (Previously
+//      hardcoded `/root/develop/auto-trading/...` which only existed on the
+//      original developer's machine.)
 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { actions as actionsNs } from '@hiepht/opentrade-core';
 
-const AUTO_TRADING_EXECUTOR_DIR = '/root/develop/auto-trading/memory/agents/executor';
 const XDG_TRADES_DIR = path.join(os.homedir(), '.config', 'opentrade');
+
+/**
+ * Detect a parent `auto-trading/` workspace tree (dev convenience). End-user
+ * installs from npm have no such directory in their cwd ancestry; this
+ * returns undefined and the mirror is silently skipped.
+ */
+function findWorkspaceExecutorDir(start = process.cwd()): string | undefined {
+  let dir = start;
+  for (let i = 0; i < 8; i++) {
+    if (
+      path.basename(dir) === 'auto-trading' &&
+      (fs.existsSync(path.join(dir, 'secrets')) || fs.existsSync(path.join(dir, 'bin')))
+    ) {
+      const exec = path.join(dir, 'memory', 'agents', 'executor');
+      return fs.existsSync(exec) ? exec : undefined;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
+}
 
 function utcDate(d = new Date()): string {
   // YYYY-MM-DD in UTC — matches the auto-trading daily ledger naming.
@@ -73,9 +96,10 @@ export function makeRecordTrade(opts: RecordTradeOptions = {}): (rec: actionsNs.
     const targets: string[] = [];
     const xdg = opts.xdgDir ?? XDG_TRADES_DIR;
     targets.push(path.join(xdg, filename));
-    // Auto-trading workspace mirror, only when the directory tree exists.
-    if (fs.existsSync(AUTO_TRADING_EXECUTOR_DIR)) {
-      targets.push(path.join(AUTO_TRADING_EXECUTOR_DIR, filename));
+    // Auto-trading workspace mirror — detected at runtime, NOT hardcoded.
+    const execDir = findWorkspaceExecutorDir();
+    if (execDir) {
+      targets.push(path.join(execDir, filename));
     }
     for (const d of opts.extraDirs ?? []) {
       targets.push(path.join(d, filename));

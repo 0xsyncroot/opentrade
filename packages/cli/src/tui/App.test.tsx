@@ -54,6 +54,7 @@ const baseProps = {
   initialChain: 'base' as const,
   walletAddress: '0xabcdef1234567890abcdef1234567890abcdef12',
   testMode: true, // pauses background polling
+  disableHistoryPersist: true, // tests must not touch ~/.config/opentrade/history.json
 };
 
 afterEach(() => {
@@ -72,6 +73,10 @@ afterEach(() => {
     modalStack: [],
     holdings: [],
     botStatus: 'off',
+    overrideRisky: false,
+    recentOverlayOpen: false,
+    statusMessage: undefined,
+    statusTone: undefined,
   });
 });
 
@@ -215,6 +220,136 @@ describe('App paste + Tab + preset 1', () => {
     if (resolveFirst) resolveFirst(snap(TOKEN_A, false));
     await settle(60);
     expect(useTuiStore.getState().currentTokenAddr).toBe(TOKEN_B);
+  });
+
+  it('slash /buy 0.05 with current token loaded dispatches a BuyIntent', async () => {
+    // Verifies the in-TUI /buy handler builds a BuyIntent (chain, token,
+    // amountWei) from the current snapshot + default preset, rather than
+    // dumping the Phase-2 placeholder.
+    const onIntent = vi.fn();
+    const { stdin } = render(
+      tree({
+        ...baseProps,
+        initialSnapshot: snap(TOKEN_A, false),
+        onIntent,
+      }),
+    );
+    await settle(60);
+    // Pasting the whole slash string is treated as a paste burst by usePaste
+    // (>6 chars) and handlePaste routes 'slash' classification straight to
+    // handleSlashCommand — same code path the user hits typing `/buy 0.05`
+    // then Enter.
+    stdin.write('/buy 0.05');
+    await settle(120);
+    expect(onIntent).toHaveBeenCalled();
+    const intent = onIntent.mock.calls[0]?.[0];
+    expect(intent?.kind).toBe('buy');
+    expect(intent?.chain).toBe('base');
+    expect(intent?.token).toBe(TOKEN_A);
+    // 0.05 ETH in wei = 5 * 10^16 = 50000000000000000
+    expect(intent?.amountWei).toBe('50000000000000000');
+  });
+
+  it('slash /init shows the shell hand-off message (no Phase 2 placeholder)', async () => {
+    const { stdin } = render(
+      tree({
+        ...baseProps,
+      }),
+    );
+    await settle(60);
+    stdin.write('/init xx'); // pad to 8 chars so usePaste treats it as paste
+    await settle(120);
+    const status = useTuiStore.getState().statusMessage ?? '';
+    // Must NOT be the old Phase-2 placeholder.
+    expect(status).not.toMatch(/Phase 2/i);
+    // Must include the exact shell command to run.
+    expect(status).toMatch(/opentrade init/);
+  });
+
+  it('slash /sell 50 without holding warns the user', async () => {
+    const onIntent = vi.fn();
+    const { stdin } = render(
+      tree({
+        ...baseProps,
+        initialSnapshot: snap(TOKEN_A, false),
+        onIntent,
+      }),
+    );
+    await settle(60);
+    stdin.write('/sell 50');
+    await settle(120);
+    expect(onIntent).not.toHaveBeenCalled();
+    expect(useTuiStore.getState().statusTone).toBe('warn');
+  });
+
+  it('slash /risk allow flips overrideRisky on', async () => {
+    const { stdin } = render(tree({ ...baseProps }));
+    await settle(60);
+    expect(useTuiStore.getState().overrideRisky).toBe(false);
+    stdin.write('/risk allow');
+    await settle(120);
+    expect(useTuiStore.getState().overrideRisky).toBe(true);
+  });
+
+  it('pushHistory + remount with same historyFile restores entries', async () => {
+    // End-to-end: paste seeds history; re-mount loads the file via
+    // resolvePaths().historyFile. Tests use a tmp dir so we don't clobber
+    // the user's real file.
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'opentrade-app-hist-'));
+    const historyFile = path.join(tmp, 'history.json');
+    try {
+      const fetchImpl = vi.fn(async () => snap(TOKEN_A, false));
+      const first = render(
+        tree({
+          ...baseProps,
+          disableHistoryPersist: false,
+          historyFile,
+          fetchSnapshotImpl: fetchImpl as unknown as typeof import('@hiepht/opentrade-core/services').fetchTokenSnapshot,
+        }),
+      );
+      await settle(60);
+      first.stdin.write(TOKEN_A);
+      // 30ms paste debounce + fetch
+      await settle(150);
+      // Flush the debounced (500ms) history save.
+      const { flushPendingSaves } = await import('./history-store.js');
+      await flushPendingSaves(historyFile);
+      first.unmount();
+      expect(fs.existsSync(historyFile)).toBe(true);
+
+      // Reset store to mimic a cold restart.
+      useTuiStore.setState({ inputHistory: [], historyIndex: -1 });
+      // Re-hydrate explicitly (production does this in main.ts before mount).
+      const { loadHistory } = await import('./history-store.js');
+      useTuiStore.getState().setHistory(loadHistory(historyFile));
+
+      // After re-hydration, inputHistory should contain TOKEN_A again.
+      expect(useTuiStore.getState().inputHistory).toContain(TOKEN_A);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('history ↑ on empty buffer loads the last entry', async () => {
+    // Seed history directly to bypass paste, then drive ↑ via stdin.
+    useTuiStore.setState({
+      inputHistory: ['0xabc', '0xdef', '0xfeed'],
+      historyIndex: -1,
+    });
+    const { stdin, lastFrame, frames } = render(
+      tree({
+        ...baseProps,
+      }),
+    );
+    await settle(60);
+    // Up arrow — Ink sends ESC [ A
+    stdin.write('[A');
+    await settle(80);
+    const rendered = lastFrame() ?? frames.join('\n');
+    expect(rendered).toContain('0xfeed');
   });
 
   it('P1-1: aborted-by-newer-paste fetch does NOT surface an error status', async () => {

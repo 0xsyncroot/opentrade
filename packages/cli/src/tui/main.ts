@@ -28,6 +28,8 @@ import {
 } from './hooks/useConfig.js';
 import { stopBotSafely } from './bot-lifecycle.js';
 import { useTuiStore } from './store/index.js';
+import { resolvePaths } from '../config/paths.js';
+import { flushPendingSaves, loadHistory } from './history-store.js';
 
 function readPemSafe(path: string | undefined): string | undefined {
   if (!path) return undefined;
@@ -77,6 +79,17 @@ async function main(): Promise<void> {
     process.stderr.write('opentrade: no GMGN_API_KEY found — run `opentrade init` or set env var.\n');
   }
 
+  // Hydrate input history from ~/.config/opentrade/history.json BEFORE
+  // mounting so ↑/↓ on first frame already has entries. loadHistory swallows
+  // missing/corrupt files so this never fails.
+  try {
+    const paths = resolvePaths();
+    const hist = loadHistory(paths.historyFile);
+    if (hist.length > 0) useTuiStore.getState().setHistory(hist);
+  } catch {
+    /* history is best-effort */
+  }
+
   const qc = new QueryClient({
     defaultOptions: {
       queries: {
@@ -111,6 +124,12 @@ async function main(): Promise<void> {
     try {
       const handle = useTuiStore.getState().botHandle;
       await stopBotSafely(handle);
+    } catch {
+      // best effort
+    }
+    try {
+      // Make sure any debounced history save lands before we exit.
+      await flushPendingSaves();
     } catch {
       // best effort
     }

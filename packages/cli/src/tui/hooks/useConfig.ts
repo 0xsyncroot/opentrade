@@ -15,8 +15,30 @@ import {
   ConfigSchema,
   type OpentradeConfig as CanonicalOpentradeConfig,
 } from '../../config/schema.js';
+import { findWorkspaceRoot } from '../../config/paths.js';
 
 export type OpentradeConfig = CanonicalOpentradeConfig;
+
+/**
+ * If running inside a parent `auto-trading/` workspace (dev convenience),
+ * return its detected key/env paths. Returns nothing otherwise — end-user
+ * installs from npm never see these.
+ *
+ * IMPORTANT: do NOT hardcode `/root/develop/...` — that path only exists on
+ * the original developer's machine. Detection is via `findWorkspaceRoot()`
+ * which walks up from cwd looking for a directory literally named
+ * `auto-trading/` containing `secrets/` or `bin/`.
+ */
+function workspaceFallbackPaths(): { pem?: string; envFile?: string } {
+  const ws = findWorkspaceRoot();
+  if (!ws) return {};
+  const pem = path.join(ws, 'secrets', 'gmgn_ed25519.pem');
+  const envFile = path.join(ws, '.env');
+  return {
+    ...(existsFile(pem) ? { pem } : {}),
+    ...(existsFile(envFile) ? { envFile } : {}),
+  };
+}
 
 export function xdgConfigDir(): string {
   const x = process.env.XDG_CONFIG_HOME;
@@ -62,8 +84,10 @@ export function resolvePrivateKeyPath(cfg: OpentradeConfig | undefined): string 
     candidates.push(process.env.GMGN_ED25519_PRIVATE_KEY_PATH);
   }
   candidates.push(path.join(xdgConfigDir(), 'secrets', 'ed25519.pem'));
-  // dev fallback when running inside the parent auto-trading workspace
-  candidates.push('/root/develop/auto-trading/secrets/gmgn_ed25519.pem');
+  // Dev fallback — detected at runtime, ONLY when running inside an
+  // auto-trading workspace tree. End users never see this.
+  const ws = workspaceFallbackPaths();
+  if (ws.pem) candidates.push(ws.pem);
 
   for (const c of candidates) {
     if (c && existsFile(c)) return c;
@@ -107,19 +131,25 @@ export function loadConfig(): OpentradeConfig {
  * Pull GMGN API key from config, env, or parent .env (dev fallback).
  * Returns undefined if none found.
  */
+/** Best-effort key=value extractor for the dev-fallback .env file. */
+function readEnvVar(envPath: string, key: string): string | undefined {
+  try {
+    const txt = readFileSync(envPath, 'utf8');
+    const m = txt.match(new RegExp(`^${key}=(.+)$`, 'm'));
+    return m && m[1] ? m[1].trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolveApiKey(cfg: OpentradeConfig | undefined): string | undefined {
   if (cfg?.gmgn?.apiKey) return cfg.gmgn.apiKey;
   if (process.env.GMGN_API_KEY) return process.env.GMGN_API_KEY;
-  // dev fallback: parse parent .env quickly
-  const envPath = '/root/develop/auto-trading/.env';
-  if (existsFile(envPath)) {
-    try {
-      const txt = readFileSync(envPath, 'utf8');
-      const m = txt.match(/^GMGN_API_KEY=(.+)$/m);
-      if (m && m[1]) return m[1].trim();
-    } catch {
-      // ignore
-    }
+  // Dev fallback — detected workspace .env, not a hardcoded path.
+  const ws = workspaceFallbackPaths();
+  if (ws.envFile) {
+    const v = readEnvVar(ws.envFile, 'GMGN_API_KEY');
+    if (v) return v;
   }
   return undefined;
 }
@@ -133,16 +163,11 @@ export function resolveWalletAddress(cfg: OpentradeConfig | undefined, chain: st
   if (chain === 'sol' && process.env.GMGN_WALLET_ADDRESS_SOL) {
     return process.env.GMGN_WALLET_ADDRESS_SOL;
   }
-  // dev fallback parse
-  const envPath = '/root/develop/auto-trading/.env';
-  if (existsFile(envPath)) {
-    try {
-      const txt = readFileSync(envPath, 'utf8');
-      const m = txt.match(/^GMGN_WALLET_ADDRESS=(.+)$/m);
-      if (m && m[1]) return m[1].trim();
-    } catch {
-      // ignore
-    }
+  // Dev fallback — detected workspace .env, not a hardcoded path.
+  const ws = workspaceFallbackPaths();
+  if (ws.envFile) {
+    const v = readEnvVar(ws.envFile, 'GMGN_WALLET_ADDRESS');
+    if (v) return v;
   }
   return undefined;
 }

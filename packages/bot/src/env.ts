@@ -77,7 +77,29 @@ const ConfigFileSchema = z
 type ConfigFile = z.infer<typeof ConfigFileSchema>;
 
 const CONFIG_HOME = path.join(os.homedir(), '.config', 'opentrade');
-const AUTO_TRADING_ROOT = '/root/develop/auto-trading';
+
+/**
+ * Walk up from cwd looking for a parent `auto-trading/` workspace (dev
+ * convenience). Returns nothing for end-user installs from npm.
+ *
+ * IMPORTANT: previous versions hardcoded `/root/develop/auto-trading` which
+ * only existed on the developer's machine. This detects at runtime instead.
+ */
+function findWorkspaceRoot(start = process.cwd()): string | undefined {
+  let dir = start;
+  for (let i = 0; i < 8; i++) {
+    if (
+      path.basename(dir) === 'auto-trading' &&
+      (fs.existsSync(path.join(dir, 'secrets')) || fs.existsSync(path.join(dir, 'bin')))
+    ) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
+}
 
 function tryReadConfigJson(): ConfigFile {
   const p = path.join(CONFIG_HOME, 'config.json');
@@ -95,8 +117,12 @@ function resolveEd25519Path(explicit: string | undefined): string | undefined {
   if (explicit && fs.existsSync(explicit)) return explicit;
   const xdg = path.join(CONFIG_HOME, 'secrets', 'ed25519.pem');
   if (fs.existsSync(xdg)) return xdg;
-  const fallback = path.join(AUTO_TRADING_ROOT, 'secrets', 'gmgn_ed25519.pem');
-  if (fs.existsSync(fallback)) return fallback;
+  // Dev fallback — detected workspace, NOT a hardcoded path.
+  const ws = findWorkspaceRoot();
+  if (ws) {
+    const fallback = path.join(ws, 'secrets', 'gmgn_ed25519.pem');
+    if (fs.existsSync(fallback)) return fallback;
+  }
   return undefined;
 }
 
