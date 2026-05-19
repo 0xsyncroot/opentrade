@@ -39,6 +39,19 @@ export async function bootstrap(): Promise<SharedCtx> {
   return { loaded, client, dispatcherCtx };
 }
 
+/**
+ * Lighter bootstrap — loads + parses config without requiring an API key
+ * or constructing a GMGN client. Used by commands that only manipulate
+ * config / files (`config`, `ab`, `alias`) so a fresh user can run
+ * `opentrade config set gmgn.apiKey ...` BEFORE they've run `init`
+ * (round-4 P1 fix — chicken-and-egg with the dashboard onboarding flow
+ * keygen prints).
+ */
+export async function bootstrapLight(): Promise<{ loaded: Awaited<ReturnType<typeof loadConfig>> }> {
+  const loaded = await loadConfig();
+  return { loaded };
+}
+
 export function parseChainArg(s: string | undefined, fallback: Chain): Chain {
   const v = s?.toLowerCase() as Chain | undefined;
   if (v === 'base' || v === 'sol' || v === 'eth' || v === 'bsc') return v;

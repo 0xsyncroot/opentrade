@@ -85,10 +85,16 @@ export function decideTier(input: TierDecisionInput): TierDecision {
       pct = computePercent(input.intent.amountWei, input.walletBalanceWei);
     }
     if (pct === undefined) {
-      // Unknown sizing — fail safe. Per reviewer P1-4, default to T2 (force
-      // confirm) rather than T1 — when wallet AND trade are both unknown we
-      // can't bound exposure, so the higher safety tier is correct.
-      return { tier: 'T2', reason: 'wallet/trade sizing unknown — default T2 (safer)' };
+      // Unknown sizing — fall back to T1 (3s inline countdown). Round 2
+      // briefly defaulted this to T2 (type-YES) as a paranoid choice, but the
+      // interactive subcommand path can't always derive wallet balance
+      // (GMGN's walletHoldings doesn't include native ETH/BNB) — forcing
+      // type-YES on every interactive buy made the fast path unusable.
+      // The user already invoked the command explicitly; T1 (auto-fire in
+      // 3 s with Esc-to-cancel) is the right interactive default. Users who
+      // want a stronger gate can still type --yes off (default) and Esc, OR
+      // run on ETH mainnet which always escalates to T2.
+      return { tier: 'T1', reason: 'wallet/trade sizing unknown — T1 (3s inline)' };
     }
     if (pct < 1) return { tier: 'T0', reason: `${pct.toFixed(2)}% of wallet < 1%`, percentOfWallet: pct };
     if (pct < 5) return { tier: 'T1', reason: `${pct.toFixed(2)}% of wallet`, percentOfWallet: pct };

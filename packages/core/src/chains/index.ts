@@ -59,9 +59,15 @@ export function isEvmChain(c: Chain): boolean {
 }
 
 export function nativeAmountToWei(chain: Chain, amount: number): bigint {
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error(`nativeAmountToWei: invalid amount ${amount}`);
+  }
   const decimals = NATIVE_DECIMALS[chain];
-  // Use string multiplication to avoid float precision loss for small fractions.
-  const [whole, frac = ''] = amount.toString().split('.');
+  // toFixed() guarantees a plain decimal string even for scientific-notation
+  // inputs like `0.0000001` (Number.toString returns `"1e-7"` which BigInt
+  // cannot parse — round-4 P1 fix).
+  const fixed = amount.toFixed(decimals);
+  const [whole, frac = ''] = fixed.split('.');
   const wholePart = BigInt(whole ?? '0') * 10n ** BigInt(decimals);
   const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
   const fracPart = fracPadded ? BigInt(fracPadded) : 0n;

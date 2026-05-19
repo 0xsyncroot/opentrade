@@ -1,7 +1,7 @@
 // `opentrade config {show|get|set|path}` — config CRUD.
 
 import { defineCommand } from 'citty';
-import { bootstrap, exitWithError, flag } from './_shared.js';
+import { bootstrapLight, exitWithError, flag } from './_shared.js';
 import { writeConfig } from '../config/load.js';
 import { ConfigSchema, type OpentradeConfig } from '../config/schema.js';
 import { emitJson, log, renderKv } from '../render/cli-renderer.js';
@@ -15,7 +15,10 @@ export const configCmd = defineCommand({
     json: { type: 'boolean' },
   },
   async run({ args }) {
-    const ctx = await bootstrap();
+    // `config` must work BEFORE the user sets up an API key (round-4 P1).
+    // bootstrapLight() loads + parses config without requiring an API key
+    // or constructing a GMGN client.
+    const ctx = await bootstrapLight();
     const cfg = ctx.loaded.config;
     const paths = ctx.loaded.paths;
     switch (args.op) {

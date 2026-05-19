@@ -73,11 +73,14 @@ describe('decideTier', () => {
     expect(d.tier).toBe('T2');
   });
 
-  it('T2 fallback when wallet/trade sizing unknown for buy (safer default)', () => {
-    // P1-4: when both walletBalanceWei and walletUsd/tradeUsd are missing we
-    // can't bound the trade as a fraction of wallet, so we escalate to T2.
+  it('T1 fallback when wallet/trade sizing unknown for buy (interactive default)', () => {
+    // Round-4 P1: GMGN's walletHoldings doesn't include native ETH/BNB on
+    // EVM chains, so the CLI buy path often can't derive walletBalanceWei.
+    // Forcing T2 (type-YES) on every interactive buy made the fast path
+    // unusable. T1 (3 s inline countdown, Esc to cancel) is the right
+    // interactive default — the user invoked the command explicitly.
     const d = decideTier({ intent: buy('base', '1') });
-    expect(d.tier).toBe('T2');
+    expect(d.tier).toBe('T1');
   });
 
   it('T0/T1/T2 via USD-shape sizing (TUI path)', () => {
