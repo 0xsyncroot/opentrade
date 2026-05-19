@@ -1,20 +1,18 @@
 // `opentrade bot {start|stop|status}` — headless VPS-only Telegram bot lifecycle.
 //
-// For personal use, `opentrade` (zero-arg TTY) auto-spawns the bot in-process
-// alongside the TUI. This subcommand is for VPS deployments without a TUI:
-//   - start: spawn packages/bot/dist/main.js detached, write PID + log
-//   - stop : SIGTERM the PID
-//   - status: report running + tail log
-//
-// Architecture note: when @hiepht/opentrade-bot exports a `startBot()` function
-// in the future, this command becomes a thin wrapper that imports and calls it
-// directly in-process. For v1 we use child_process for stability (no React/Ink
-// pulled in, no overlap with TUI mount).
+// `start` runs the bot in the FOREGROUND of the current process (P0-3 fix).
+// The previous detached child-process approach looked for a path that doesn't
+// exist after `npm i -g @hiepht/opentrade` — the bot dist lives bundled inside
+// the cli artifact, not in a separate node_modules tree. Running inline is
+// also simpler: SIGTERM → graceful stop, PID file = process.pid, log goes to
+// the configured log file or stderr.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import process from 'node:process';
 import { defineCommand } from 'citty';
+import * as botModule from '@hiepht/opentrade-bot/start';
+import type { Chain } from '@hiepht/opentrade-core/chains';
 import { bootstrap, exitWithError, flag } from './_shared.js';
 import { emitJson, log, color } from '../render/cli-renderer.js';
 
@@ -35,37 +33,82 @@ export const botCmd = defineCommand({
           log.error('config.telegram.disabled=true — user opted out. Run `opentrade init --tg-only` to re-enable.');
           process.exit(2);
         }
-        if (!cfg.telegram?.botToken || !cfg.telegram?.ownerChatId) {
+        if (!cfg.telegram?.botToken || cfg.telegram?.ownerChatId === undefined) {
           log.error(
             'telegram not configured. Run `opentrade init --tg-only` or `opentrade config set telegram.botToken=... telegram.ownerChatId=...`.',
           );
           process.exit(2);
         }
         if (existsPid(paths.botPidFile)) {
-          log.warn(`bot already running (pid file ${paths.botPidFile}). Run \`opentrade bot status\`.`);
-          process.exit(1);
+          const pid = Number(fs.readFileSync(paths.botPidFile, 'utf8').trim());
+          if (Number.isFinite(pid) && isProcAlive(pid)) {
+            log.warn(`bot already running (pid ${pid}). Run \`opentrade bot stop\` first.`);
+            process.exit(1);
+          }
+          // Stale PID file — remove it.
+          try { fs.unlinkSync(paths.botPidFile); } catch { /* */ }
         }
-        const botEntry = resolveBotEntry();
-        if (!botEntry) {
-          log.error(
-            'cannot find @hiepht/opentrade-bot dist/main.js. Build the bot package first (Phase 4): `pnpm --filter @hiepht/opentrade-bot build`.',
-          );
+        if (typeof botModule.startBot !== 'function') {
+          log.error('bot module not bundled — rebuild @hiepht/opentrade.');
           process.exit(2);
         }
-        const out = fs.openSync(paths.botLogFile, 'a');
-        const err = fs.openSync(paths.botLogFile, 'a');
-        const child = spawn(process.execPath, [botEntry], {
-          detached: true,
-          stdio: ['ignore', out, err],
-          env: {
-            ...process.env,
-            OPENTRADE_BOT_TOKEN: cfg.telegram.botToken,
-            OPENTRADE_BOT_OWNER_CHAT_ID: String(cfg.telegram.ownerChatId),
-          },
+
+        const defaultChain: Chain = (cfg.defaultChain ?? 'base') as Chain;
+        const wallets = (cfg.wallets ?? {}) as Partial<Record<Chain, string>>;
+
+        // Write PID file using the current process PID — the bot runs INLINE.
+        fs.mkdirSync(path.dirname(paths.botPidFile), { recursive: true });
+        fs.writeFileSync(paths.botPidFile, String(process.pid), { mode: 0o600 });
+        try { fs.chmodSync(paths.botPidFile, 0o600); } catch { /* */ }
+
+        const logger = {
+          info: (m: string) => process.stderr.write(`[bot] ${m}\n`),
+          error: (m: string) => process.stderr.write(`[bot:err] ${m}\n`),
+        };
+
+        log.success(`starting bot (pid ${process.pid}). Send SIGTERM or run \`opentrade bot stop\` to stop.`);
+
+        let handle: Awaited<ReturnType<typeof botModule.startBot>> | undefined;
+        try {
+          handle = await botModule.startBot({
+            telegramBotToken: cfg.telegram.botToken,
+            telegramOwnerChatId: String(cfg.telegram.ownerChatId),
+            dispatcherCtx: ctx.dispatcherCtx,
+            wallets,
+            defaultChain,
+            logger,
+          });
+        } catch (err) {
+          log.error(`failed to start: ${(err as Error).message}`);
+          try { fs.unlinkSync(paths.botPidFile); } catch { /* */ }
+          process.exit(1);
+        }
+
+        let shuttingDown = false;
+        const stop = async (sig: string): Promise<void> => {
+          if (shuttingDown) return;
+          shuttingDown = true;
+          process.stderr.write(`[bot] received ${sig}, stopping…\n`);
+          try {
+            await Promise.race([
+              handle!.stop(),
+              new Promise<void>((res) => setTimeout(res, 5_000)),
+            ]);
+          } catch {
+            /* swallow */
+          }
+          try { fs.unlinkSync(paths.botPidFile); } catch { /* */ }
+          process.exit(0);
+        };
+        process.on('SIGINT', () => void stop('SIGINT'));
+        process.on('SIGTERM', () => void stop('SIGTERM'));
+
+        // Keep the loop alive — bot.start() returns a promise that resolves
+        // when the bot stops; we await it so the process exits cleanly when
+        // the bot ever stops on its own.
+        await new Promise<void>(() => {
+          // never resolves; SIGTERM / SIGINT handler exits the process.
         });
-        child.unref();
-        fs.writeFileSync(paths.botPidFile, String(child.pid ?? ''), { mode: 0o600 });
-        log.success(`bot started — pid ${child.pid}, log ${paths.botLogFile}`);
         return;
       }
       case 'stop': {
@@ -81,10 +124,12 @@ export const botCmd = defineCommand({
         }
         try {
           process.kill(pid, 'SIGTERM');
-          fs.unlinkSync(paths.botPidFile);
+          // PID file is cleared by the running process's signal handler.
           log.success(`sent SIGTERM to pid ${pid}`);
         } catch (e) {
-          log.error(`failed: ${(e as Error).message}`);
+          // The PID is stale — clean up.
+          try { fs.unlinkSync(paths.botPidFile); } catch { /* */ }
+          log.error(`failed (process likely gone): ${(e as Error).message}`);
           process.exit(1);
         }
         return;
@@ -139,19 +184,4 @@ function tailFile(file: string, lines: number): string {
   } catch {
     return '';
   }
-}
-
-function resolveBotEntry(): string | undefined {
-  const candidates = [
-    // installed via workspace dep — symlink in cli/node_modules
-    path.join(process.cwd(), 'node_modules', '@hiepht', 'opentrade-bot', 'dist', 'main.js'),
-    // monorepo direct path (dev)
-    path.join(process.cwd(), '..', 'bot', 'dist', 'main.js'),
-    path.join(process.cwd(), 'packages', 'bot', 'dist', 'main.js'),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
-  }
-  // Fallback: try `import.meta.resolve`-style — give up gracefully.
-  return undefined;
 }

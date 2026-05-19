@@ -34,11 +34,14 @@ export async function fetchTokenSnapshot(
   args: { chain: Chain; token: string; walletAddress: string; signal?: AbortSignal },
 ): Promise<TokenSnapshot> {
   // Run in parallel; any failure surfaces but doesn't tank the others.
+  // P1-2: forward the caller's AbortSignal into every endpoint so a stale
+  // paste's in-flight requests are cancelled when a newer paste lands.
+  const { signal } = args;
   const [tokenRes, secRes, poolRes, holdingsRes] = await Promise.allSettled([
-    gmgn.tokenInfo(client, { chain: args.chain, token: args.token }),
-    gmgn.tokenSecurity(client, { chain: args.chain, token: args.token }),
-    gmgn.poolInfo(client, { chain: args.chain, token: args.token }),
-    gmgn.walletHoldings(client, { chain: args.chain, walletAddress: args.walletAddress, limit: 50 }),
+    gmgn.tokenInfo(client, { chain: args.chain, token: args.token, ...(signal ? { signal } : {}) }),
+    gmgn.tokenSecurity(client, { chain: args.chain, token: args.token, ...(signal ? { signal } : {}) }),
+    gmgn.poolInfo(client, { chain: args.chain, token: args.token, ...(signal ? { signal } : {}) }),
+    gmgn.walletHoldings(client, { chain: args.chain, walletAddress: args.walletAddress, limit: 50, ...(signal ? { signal } : {}) }),
   ]);
 
   if (tokenRes.status !== 'fulfilled') throw tokenRes.reason;

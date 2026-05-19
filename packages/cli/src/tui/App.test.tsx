@@ -216,4 +216,41 @@ describe('App paste + Tab + preset 1', () => {
     await settle(60);
     expect(useTuiStore.getState().currentTokenAddr).toBe(TOKEN_B);
   });
+
+  it('P1-1: aborted-by-newer-paste fetch does NOT surface an error status', async () => {
+    // Bug: capture of abortable.controller.signal AFTER await meant the catch
+    // saw the NEW controller (not aborted) → user got "Fetch failed: AbortError"
+    // flashed on screen for every double-paste.
+    const fetchImpl = vi.fn(async (_client: unknown, args: { token: string; signal?: AbortSignal }) => {
+      if (args.token === TOKEN_A) {
+        // Simulate a fetch that gets aborted: when signal fires, reject with
+        // an AbortError. (The real undici fetch behaves identically.)
+        return new Promise<TokenSnapshot>((_res, rej) => {
+          args.signal?.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted.');
+            err.name = 'AbortError';
+            rej(err);
+          });
+        });
+      }
+      return snap(TOKEN_B, false);
+    });
+    const { stdin } = render(
+      tree({
+        ...baseProps,
+        fetchSnapshotImpl: fetchImpl as unknown as typeof import('@hiepht/opentrade-core/services').fetchTokenSnapshot,
+      }),
+    );
+    await settle(60);
+    stdin.write(TOKEN_A);
+    await settle(90);
+    stdin.write(TOKEN_B);
+    // Give the rejected first promise time to surface (or be swallowed).
+    await settle(150);
+    const state = useTuiStore.getState();
+    expect(state.currentTokenAddr).toBe(TOKEN_B);
+    // The crucial assertion: no "Fetch failed" error status surfaced.
+    expect(state.statusTone).not.toBe('error');
+    expect(state.statusMessage ?? '').not.toMatch(/abort|fetch failed/i);
+  });
 });

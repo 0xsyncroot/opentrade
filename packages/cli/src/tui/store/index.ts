@@ -36,6 +36,10 @@ export type BotStatus = 'off' | 'starting' | 'connected' | 'error';
 
 export interface BotHandle {
   stop: () => Promise<void>;
+  /** Optional — only the @hiepht/opentrade-bot handle implements this. */
+  onStatusChange?: (cb: (s: BotStatus) => void) => () => void;
+  /** Optional — only the @hiepht/opentrade-bot handle implements this. */
+  status?: () => BotStatus;
 }
 
 export interface TuiState {

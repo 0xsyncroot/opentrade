@@ -31,6 +31,8 @@ export interface RequestOpts {
   body?: Record<string, unknown>;
   /** Critical-tier endpoints require Ed25519 signing. */
   critical?: boolean;
+  /** Caller-provided abort signal — composed with the per-request timeout. */
+  signal?: AbortSignal;
 }
 
 export class GmgnError extends Error {
@@ -103,15 +105,20 @@ export class GmgnClient {
       if (bodyStr) process.stderr.write(`[gmgn] body = ${bodyStr}\n`);
     }
 
-    const ctrl = new AbortController();
-    const to = setTimeout(() => ctrl.abort(), this.cfg.timeoutMs);
+    // Compose timeout signal with optional caller signal so abort propagates
+    // both ways (P1-2 fix). Node 20+ ships AbortSignal.any.
+    const timeoutCtrl = new AbortController();
+    const to = setTimeout(() => timeoutCtrl.abort(), this.cfg.timeoutMs);
+    const signal = opts.signal
+      ? AbortSignal.any([timeoutCtrl.signal, opts.signal])
+      : timeoutCtrl.signal;
     let res: Awaited<ReturnType<typeof undiciFetch>>;
     try {
       res = await undiciFetch(url, {
         method: opts.method,
         headers,
         body: opts.method === 'POST' && bodyStr ? bodyStr : undefined,
-        signal: ctrl.signal,
+        signal,
       });
     } finally {
       clearTimeout(to);

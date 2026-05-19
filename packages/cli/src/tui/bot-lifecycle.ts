@@ -5,11 +5,16 @@
 //   - same zustand store is shared so phone trades update the TUI positions list
 //   - graceful shutdown on quit with a 2s timeout
 //
-// The `@hiepht/opentrade-bot` package ships in Phase 4. We import it dynamically
-// and degrade gracefully when it's not installed — that way Phase 3 TUI works
-// today and seamlessly picks up the bot once Phase 4 lands.
+// IMPORTANT (P0-1 + P0-2): the bot module is statically imported below, NOT
+// dynamic-from-variable. tsup `noExternal: [/^@hiepht\/opentrade/]` then inlines
+// the bot source (and core) into `dist/tui/main.js`. grammY remains external,
+// loaded from node_modules at runtime via the cli's `dependencies` field. We
+// guard the call site with try/catch so a misconfigured runtime can't crash
+// module evaluation.
 
 import type { DispatcherContext } from '@hiepht/opentrade-core/actions';
+import type { Chain } from '@hiepht/opentrade-core/chains';
+import * as botModule from '@hiepht/opentrade-bot/start';
 import type { OpentradeConfig } from './hooks/useConfig.js';
 import type { BotHandle, TuiState } from './store/index.js';
 
@@ -23,10 +28,6 @@ export interface StartBotArgs {
   };
 }
 
-export interface BotModule {
-  startBot: (args: StartBotArgs) => Promise<BotHandle>;
-}
-
 /** Decide if bot SHOULD attempt to start based on config. */
 export function botShouldStart(config: OpentradeConfig | undefined): boolean {
   if (!config?.telegram) return false;
@@ -34,23 +35,13 @@ export function botShouldStart(config: OpentradeConfig | undefined): boolean {
   return Boolean(config.telegram.botToken && config.telegram.ownerChatId);
 }
 
-/** Resolve the bot module dynamically — tolerate missing dep. */
-export async function loadBotModule(): Promise<BotModule | null> {
-  try {
-    // The Phase 4 bot package exports `startBot` from its `/start` subpath.
-    // Wrapped in eval so bundlers don't try to resolve at build time.
-    const moduleId = '@hiepht/opentrade-bot/start';
-    const mod = (await import(/* @vite-ignore */ moduleId)) as Partial<BotModule>;
-    if (typeof mod.startBot === 'function') return mod as BotModule;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Start the bot if configured and the bot package is importable.
  * Always resolves (never throws) — callers read status from the store.
+ *
+ * Unpacks the canonical config shape (`config.telegram.botToken`,
+ * `config.telegram.ownerChatId`, `config.wallets`, `config.defaultChain`) and
+ * passes it in the shape `startBot` expects (P0-2 fix).
  */
 export async function startBotIfConfigured(args: {
   config: OpentradeConfig | undefined;
@@ -62,22 +53,58 @@ export async function startBotIfConfigured(args: {
     args.setBot({ status: 'off', error: undefined, handle: undefined });
     return undefined;
   }
-  args.setBot({ status: 'starting', error: undefined });
-  const mod = await loadBotModule();
-  if (!mod) {
+
+  // Sanity: the static import should always succeed in a built cli (the bot is
+  // bundled into dist/tui/main.js). If a future refactor breaks this we fall
+  // back to a clear error state instead of crashing the TUI.
+  if (typeof botModule.startBot !== 'function') {
     args.setBot({
-      status: 'off',
-      error: 'bot package not installed',
+      status: 'error',
+      error: 'bot module missing startBot export',
       handle: undefined,
     });
     return undefined;
   }
-  try {
-    const handle = await mod.startBot({
-      config: args.config,
-      dispatcherCtx: args.dispatcherCtx,
-      store: args.store,
+
+  args.setBot({ status: 'starting', error: undefined });
+
+  // Build the args the bot actually expects (see packages/bot/src/start.ts
+  // StartBotOpts).
+  const telegramBotToken = args.config.telegram?.botToken;
+  const telegramOwnerChatId = args.config.telegram?.ownerChatId;
+  if (!telegramBotToken || telegramOwnerChatId === undefined) {
+    args.setBot({
+      status: 'off',
+      error: 'telegram bot token or owner chat id missing',
+      handle: undefined,
     });
+    return undefined;
+  }
+
+  // The canonical config types `wallets` as `Partial<Record<Chain, string>>`
+  // already — pass through.
+  const wallets = (args.config.wallets ?? {}) as Partial<Record<Chain, string>>;
+  const defaultChain: Chain = (args.config.defaultChain ?? 'base') as Chain;
+
+  try {
+    const handle = await botModule.startBot({
+      telegramBotToken,
+      telegramOwnerChatId: String(telegramOwnerChatId),
+      dispatcherCtx: args.dispatcherCtx,
+      wallets,
+      defaultChain,
+    });
+
+    // P1-7 fix: subscribe to status changes so the StatusBar reflects the
+    // bot's actual state (including async errors that happen AFTER startBot
+    // returns successfully). Without this, a polling crash inside grammy is
+    // only visible via the bus internal state.
+    handle.onStatusChange((s) => {
+      // Map BotStatus from start.ts (off/starting/connected/error) directly
+      // — the union types are identical.
+      args.setBot({ status: s });
+    });
+
     args.setBot({ status: 'connected', error: undefined, handle });
     return handle;
   } catch (err) {

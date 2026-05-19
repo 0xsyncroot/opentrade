@@ -26,7 +26,15 @@ function todayUtc(): string {
 
 function safeWriteAppend(file: string, content: string): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.appendFileSync(file, content, { mode: 0o644 });
+  fs.appendFileSync(file, content, { mode: 0o600 });
+  // appendFileSync's `mode` is subject to umask — chmodSync forces the actual
+  // permissions. Audit ledgers contain wallet addresses + tx hashes; 0o600 is
+  // the floor. (P1-8 fix.)
+  try {
+    fs.chmodSync(file, 0o600);
+  } catch {
+    /* best effort — non-POSIX FS */
+  }
 }
 
 export function formatTradeBlock(rec: TradeRecord): string {

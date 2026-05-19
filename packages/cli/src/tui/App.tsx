@@ -136,7 +136,7 @@ export const App: React.FC<AppProps> = (props) => {
     chain,
     walletAddress,
     tokenAddress: currentTokenAddr,
-    paused: isTyping || modalStack.length > 0 || testMode === true,
+    paused: isTyping || modalStack.length > 0 || slashOpen || testMode === true,
   });
   useEffect(() => {
     if (snapshotQuery.data) {
@@ -148,7 +148,9 @@ export const App: React.FC<AppProps> = (props) => {
     client,
     chain,
     walletAddress,
-    paused: isTyping || testMode === true,
+    // P1-12: pause holdings polling when ANY modal/slash overlay is open so
+    // an open confirm modal can't see the position size change mid-confirm.
+    paused: isTyping || modalStack.length > 0 || slashOpen || testMode === true,
     intervalMs: view === 'positions' ? 5_000 : 10_000,
   });
   useEffect(() => {
@@ -244,6 +246,11 @@ export const App: React.FC<AppProps> = (props) => {
     setStatus(`Loading ${addr.slice(0, 10)}…`, 'info');
 
     const ticket = abortable.next();
+    // Capture the signal BEFORE awaiting — by the time the catch runs,
+    // abortable.controller may have been replaced by a newer paste. The
+    // captured signal still reflects whether THIS ticket's request was
+    // aborted. (P1-1 fix.)
+    const signal = abortable.controller.signal;
     const fetcher = props.fetchSnapshotImpl ?? fetchTokenSnapshot;
     if (!client && !props.fetchSnapshotImpl) {
       setStatus('No GMGN client — run `opentrade init` first.', 'error');
@@ -254,14 +261,19 @@ export const App: React.FC<AppProps> = (props) => {
         chain: nextChain,
         token: addr,
         walletAddress,
-        signal: abortable.controller.signal,
+        signal,
       });
       if (abortable.isStale(ticket)) return; // a newer paste landed first
       setCurrentToken(snap, snap.token.address);
       setView('token');
       setStatus(undefined, undefined);
     } catch (err) {
-      if (abortable.controller.signal.aborted) return;
+      // The captured signal + ticket together cover both cases:
+      //   1) a newer paste aborted us → signal.aborted = true
+      //   2) we resolved on our own but a newer paste arrived since →
+      //      isStale(ticket) = true
+      // Either way, swallow silently.
+      if (signal.aborted || abortable.isStale(ticket)) return;
       const msg = err instanceof Error ? err.message : String(err);
       setStatus(`Fetch failed: ${msg.slice(0, 80)}`, 'error');
     }
@@ -327,10 +339,34 @@ export const App: React.FC<AppProps> = (props) => {
     }
 
     // Buy/Sell — push a confirmation modal first.
+    // P1-4: compute realistic walletUsd + tradeUsd so the tier policy can
+    // actually upgrade from T1 → T2 for trades >5% of wallet. We sum holdings
+    // (best available proxy for total wallet USD until a native-balance feed
+    // lands) and derive trade USD from the intent's wei × current token
+    // price for buys, or from the held position's USD for sells.
+    const walletUsd = holdings.reduce((s, h) => s + (h.usd_value ?? 0), 0) || undefined;
+    let tradeUsd: number | undefined;
+    if (intent.kind === 'buy') {
+      // For buys the input is native (ETH/SOL/BNB) so we need a native USD
+      // price. Approximate from `currentToken.token.price` when the input
+      // token is the same chain native — not always true, but a reasonable
+      // worst-case lower-bound. If we can't derive it, leave tradeUsd as
+      // undefined so the canonical tier function escalates to T2 safely.
+      // Better: use the held-USD value as a comparable scale (most useful
+      // when the user already has a position in this chain's native).
+      // For now, leave tradeUsd undefined for buy when we lack a native USD
+      // price — the canonical decideTier will safely escalate to T2.
+      tradeUsd = undefined;
+    } else if (intent.kind === 'sell') {
+      const holding = currentToken?.myHolding;
+      if (holding) {
+        tradeUsd = ((holding.usd_value ?? 0) * intent.percent) / 100;
+      }
+    }
     const tier = decideConfirmTier({
       intent,
-      walletUsd: undefined,
-      tradeUsd: undefined,
+      walletUsd,
+      tradeUsd,
       safetyWarn: currentToken?.safety.warn === true,
     });
     if (tier === 'T0') {

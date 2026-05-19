@@ -18,6 +18,13 @@ export interface TierDecisionInput {
   intent: Intent;
   /** Native balance in same units as intent.amountWei (for buy) — used to compute %. */
   walletBalanceWei?: string | bigint;
+  /**
+   * Optional USD-shaped sizing (TUI path). When both walletUsd AND tradeUsd
+   * are set, the % computation uses these; otherwise we fall back to
+   * walletBalanceWei vs intent.amountWei.
+   */
+  walletUsd?: number;
+  tradeUsd?: number;
   /** Override — config.noConfirm flips everything to T0 silent. */
   noConfirm?: boolean;
   /** True when snapshot.safety.warn set (forces T3). */
@@ -65,10 +72,23 @@ export function decideTier(input: TierDecisionInput): TierDecision {
       return { tier: 'T2', reason: 'ETH mainnet trade — always type-YES' };
     }
 
-    const pct = computePercent(input.intent.amountWei, input.walletBalanceWei);
+    // Prefer USD-based sizing when supplied (TUI path).
+    let pct: number | undefined;
+    if (
+      typeof input.walletUsd === 'number' &&
+      input.walletUsd > 0 &&
+      typeof input.tradeUsd === 'number' &&
+      input.tradeUsd >= 0
+    ) {
+      pct = (input.tradeUsd / input.walletUsd) * 100;
+    } else {
+      pct = computePercent(input.intent.amountWei, input.walletBalanceWei);
+    }
     if (pct === undefined) {
-      // Unknown balance — be safe, T1
-      return { tier: 'T1', reason: 'wallet balance unknown — default T1 inline confirm' };
+      // Unknown sizing — fail safe. Per reviewer P1-4, default to T2 (force
+      // confirm) rather than T1 — when wallet AND trade are both unknown we
+      // can't bound exposure, so the higher safety tier is correct.
+      return { tier: 'T2', reason: 'wallet/trade sizing unknown — default T2 (safer)' };
     }
     if (pct < 1) return { tier: 'T0', reason: `${pct.toFixed(2)}% of wallet < 1%`, percentOfWallet: pct };
     if (pct < 5) return { tier: 'T1', reason: `${pct.toFixed(2)}% of wallet`, percentOfWallet: pct };
@@ -126,16 +146,11 @@ export async function runConfirmation(ctx: ConfirmContext): Promise<boolean> {
       return true;
 
     case 'T1': {
-      // 3s inline countdown with Esc cancel via clack `confirm`.
-      const result = await Promise.race([
-        p.confirm({
-          message: 'Confirm? (auto-yes in 3s)',
-          initialValue: true,
-        }),
-        new Promise<boolean>((res) => setTimeout(() => res(true), 3000)),
-      ]);
-      if (p.isCancel(result)) return false;
-      return result === true;
+      // 3s inline countdown — manual readline keypress + countdown render.
+      // (P1-3 fix: clack's `confirm` keeps stdin in raw mode after the race
+      // timeout fires, dangling the prompt and breaking the next command's
+      // input. Manual approach gives us full control over teardown.)
+      return await runT1Countdown(3000);
     }
 
     case 'T2': {
@@ -168,6 +183,93 @@ export async function runConfirmation(ctx: ConfirmContext): Promise<boolean> {
       return String(v).trim().toUpperCase() === expected;
     }
   }
+}
+
+/**
+ * T1 countdown — render `Confirm? (Ns) [Enter=now | Esc=cancel]` for `totalMs`
+ * total, decrementing each 100ms. Resolve true on timeout / Enter, false on Esc.
+ *
+ * Designed for headless behaviour: when stdin is NOT a TTY (e.g. piped) we
+ * skip the keypress listener and just sleep for the full window then return
+ * true — this matches the user-confirmed default of "auto-yes after 3s".
+ *
+ * Exposed so tests can call it directly.
+ */
+export async function runT1Countdown(totalMs: number, opts: {
+  stdin?: NodeJS.ReadStream;
+  stdout?: NodeJS.WriteStream;
+} = {}): Promise<boolean> {
+  const stdin = opts.stdin ?? process.stdin;
+  const stdout = opts.stdout ?? process.stdout;
+  const isTty = Boolean(stdin.isTTY);
+
+  return await new Promise<boolean>((resolve) => {
+    let remaining = totalMs;
+    let done = false;
+    const wasRaw = stdin.isRaw === true;
+
+    const cleanup = (result: boolean): void => {
+      if (done) return;
+      done = true;
+      clearInterval(timer);
+      if (isTty) {
+        stdin.removeListener('data', onData);
+        try {
+          stdin.setRawMode?.(wasRaw);
+        } catch {
+          /* */
+        }
+        if (!wasRaw) stdin.pause();
+        // Clear the countdown line + newline so the next prompt renders cleanly.
+        stdout.write('\r\x1b[2K\n');
+      }
+      resolve(result);
+    };
+
+    const render = (): void => {
+      const sec = (remaining / 1000).toFixed(1);
+      stdout.write(`\rConfirm? auto-yes in ${sec}s · Enter=now · Esc=cancel  `);
+    };
+
+    const onData = (buf: Buffer): void => {
+      const s = buf.toString();
+      // Enter (CR or LF) → confirm immediately
+      if (s.includes('\r') || s.includes('\n')) {
+        cleanup(true);
+        return;
+      }
+      // Esc (0x1B) → cancel
+      if (s.includes('\x1b')) {
+        cleanup(false);
+        return;
+      }
+      // Ctrl+C — treat as cancel
+      if (s.includes('\x03')) {
+        cleanup(false);
+        return;
+      }
+    };
+
+    if (isTty) {
+      try {
+        stdin.setRawMode?.(true);
+      } catch {
+        /* */
+      }
+      stdin.resume();
+      stdin.on('data', onData);
+    }
+
+    render();
+    const timer = setInterval(() => {
+      remaining -= 100;
+      if (remaining <= 0) {
+        cleanup(true);
+        return;
+      }
+      render();
+    }, 100);
+  });
 }
 
 export function explainChainPolicy(chain: Chain): string | undefined {

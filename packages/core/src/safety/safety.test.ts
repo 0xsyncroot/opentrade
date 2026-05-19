@@ -70,4 +70,35 @@ describe('shouldUseAntiMev', () => {
   it('default ON when pool info missing', () => {
     expect(shouldUseAntiMev('base', undefined)).toBe(true);
   });
+
+  // P1-6 — V4 detection must handle the various exchange label formats GMGN
+  // surfaces. The original `includes('uniswap_v4')` only caught one form.
+  it.each([
+    'uniswap_v4',
+    'Uniswap V4',
+    'uniswap-v4',
+    'uniswap v4',
+    'UniswapV4',
+    'univ4',
+    'UniV4',
+  ])('detects V4 from exchange label "%s"', (label) => {
+    expect(shouldUseAntiMev('base', { address: '0x', exchange: label })).toBe(false);
+  });
+
+  it('detects V4 by PoolManager address when exchange label is missing', () => {
+    // address-based fallback: pool's address === Uniswap V4 PoolManager on Base
+    expect(
+      shouldUseAntiMev('base', {
+        address: '0x498581ff718922c3f8e6a244956af099b2652b2b',
+        exchange: '',
+      }),
+    ).toBe(false);
+  });
+
+  it('does NOT misfire on unrelated labels (no false positives)', () => {
+    expect(shouldUseAntiMev('base', { address: '0x', exchange: 'sushi_v2' })).toBe(true);
+    expect(shouldUseAntiMev('base', { address: '0x', exchange: 'aerodrome' })).toBe(true);
+    // v3 should not match v4 pattern
+    expect(shouldUseAntiMev('base', { address: '0x', exchange: 'uniswap_v3' })).toBe(true);
+  });
 });

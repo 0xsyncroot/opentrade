@@ -3,41 +3,20 @@
 // Reads ~/.config/opentrade/config.json. Falls back to env vars for the
 // dev-shared `auto-trading/.env` path when running inside the parent workspace.
 //
-// Schema is intentionally loose at the wire (zod-validated at the boundary so we
-// can warn the user with a clear hint instead of crashing).
+// Schema imported from `../config/schema.ts` so the TUI uses the canonical
+// shape (P1-5 fix — eliminates the duplicate schema that stripped `disabled`
+// and `deferred` fields, breaking opt-out persistence).
 
 import { readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
-import { z } from 'zod';
+import {
+  ConfigSchema,
+  type OpentradeConfig as CanonicalOpentradeConfig,
+} from '../../config/schema.js';
 
-const ConfigSchema = z.object({
-  defaultChain: z.enum(['base', 'sol', 'eth', 'bsc']).default('base'),
-  gmgn: z
-    .object({
-      apiKey: z.string().min(1),
-      privateKeyPath: z.string().optional(),
-      privateKeyPassphrase: z.string().optional(),
-    })
-    .optional(),
-  wallets: z
-    .object({
-      base: z.string().optional(),
-      sol: z.string().optional(),
-      eth: z.string().optional(),
-      bsc: z.string().optional(),
-    })
-    .default({}),
-  telegram: z
-    .object({
-      botToken: z.string().optional(),
-      ownerChatId: z.union([z.string(), z.number()]).optional(),
-    })
-    .optional(),
-});
-
-export type OpentradeConfig = z.infer<typeof ConfigSchema>;
+export type OpentradeConfig = CanonicalOpentradeConfig;
 
 export function xdgConfigDir(): string {
   const x = process.env.XDG_CONFIG_HOME;

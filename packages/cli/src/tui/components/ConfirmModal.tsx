@@ -7,9 +7,13 @@
 //
 // The modal is dumb: App owns the policy decision and pushes a ModalDescriptor
 // onto the store. This component just renders + resolves.
+//
+// Tier decision delegated to the canonical `decideTier()` in
+// `safety/confirm.ts` (P1-4: single source of truth).
 
 import { Box, Text } from 'ink';
 import React, { useEffect, useState } from 'react';
+import { decideTier as canonicalDecideTier } from '../../safety/confirm.js';
 import { theme } from '../theme.js';
 import type { ModalDescriptor } from '../store/index.js';
 
@@ -107,15 +111,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({ modal, typedText, on
 };
 
 /**
- * Decide the confirmation tier for a buy/sell intent. Pure function — App
- * calls before pushing the modal so the policy table is testable on its own.
+ * Decide the confirmation tier for a buy/sell intent. Thin wrapper around the
+ * canonical `decideTier()` in `safety/confirm.ts` (single source of truth —
+ * P1-4 fix).
  *
- * Policy (plan §"TUI ergonomics §5"):
- *   - safety.warn (honeypot/rug/top10 flagged) → T3
- *   - amount > 5% wallet OR chain === 'eth' (mainnet)   → T2
- *   - amount 1-5% wallet                                → T1
- *   - amount < 1% wallet                                → T0 (silent)
- *   - sell 100%                                         → at least T1
+ * Accepts walletUsd / tradeUsd (TUI-friendly), forwards to `decideTier`.
  */
 export function decideConfirmTier(input: {
   intent: import('@hiepht/opentrade-core/schemas').Intent;
@@ -123,26 +123,10 @@ export function decideConfirmTier(input: {
   tradeUsd: number | undefined;
   safetyWarn?: boolean;
 }): 'T0' | 'T1' | 'T2' | 'T3' {
-  if (input.safetyWarn) return 'T3';
-
-  if (input.intent.kind === 'sell' && input.intent.percent === 100) {
-    // baseline T1; let upstream upgrade.
-    return 'T1';
-  }
-
-  if (input.intent.kind === 'buy') {
-    if (input.intent.chain === 'eth') return 'T2';
-    const wallet = input.walletUsd ?? 0;
-    const trade = input.tradeUsd ?? 0;
-    if (wallet > 0) {
-      const pct = (trade / wallet) * 100;
-      if (pct > 5) return 'T2';
-      if (pct >= 1) return 'T1';
-      return 'T0';
-    }
-    // Unknown wallet usd → conservative T1
-    return 'T1';
-  }
-
-  return 'T1';
+  return canonicalDecideTier({
+    intent: input.intent,
+    ...(input.walletUsd !== undefined ? { walletUsd: input.walletUsd } : {}),
+    ...(input.tradeUsd !== undefined ? { tradeUsd: input.tradeUsd } : {}),
+    ...(input.safetyWarn !== undefined ? { safetyWarn: input.safetyWarn } : {}),
+  }).tier;
 }

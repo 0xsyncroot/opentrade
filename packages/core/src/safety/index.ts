@@ -85,7 +85,7 @@ export function evaluateSecurity(
 
   // Top-10 holder rate — block > 0.55 (ex V4 PoolManager on Base)
   const top10Raw = toNum(security?.top_10_holder_rate);
-  const isV4Base = (poolInfo?.exchange ?? '').toLowerCase().includes('uniswap_v4');
+  const isV4Base = isUniswapV4Pool(poolInfo);
   // If V4 on Base, ~one of the top10 entries is the PoolManager; subtract a notional
   // 10% off the headline rate to approximate. (UI also surfaces an explanation.)
   const top10Adj = isV4Base ? Math.max(0, top10Raw - 0.1) : top10Raw;
@@ -163,9 +163,26 @@ export function evaluateSecurity(
  */
 export function shouldUseAntiMev(chain: Chain, poolInfo: PoolInfo | undefined): boolean {
   if (chain === 'sol') return true;
-  const exchange = (poolInfo?.exchange ?? '').toLowerCase();
-  if (exchange.includes('uniswap_v4')) return false;
+  if (isUniswapV4Pool(poolInfo)) return false;
   return true;
+}
+
+/**
+ * Robust Uniswap V4 detection — accepts the various exchange labels GMGN
+ * returns (`uniswap_v4`, `Uniswap V4`, `uniswap-v4`, `univ4`, etc.) and falls
+ * back to address-based detection against the V4 PoolManager. (P1-6 fix —
+ * string-brittle detection missed common label formats.)
+ */
+export function isUniswapV4Pool(poolInfo: PoolInfo | undefined): boolean {
+  if (!poolInfo) return false;
+  const exchange = String(poolInfo.exchange ?? '');
+  // Match any of: uniswap_v4, uniswap v4, uniswap-v4, uniswapv4, univ4 (case-insensitive)
+  if (/uniswap[\s_-]?v4|univ4/i.test(exchange)) return true;
+  // Address-based fallback: pool's `address` field or any nested address
+  // that matches the V4 PoolManager on Base.
+  const poolAddr = String((poolInfo as { address?: string }).address ?? '').toLowerCase();
+  if (poolAddr === UNI_V4_POOLMANAGER_BASE) return true;
+  return false;
 }
 
 /** Quick sanity check: is `address` the Uniswap V4 pool manager on Base? */

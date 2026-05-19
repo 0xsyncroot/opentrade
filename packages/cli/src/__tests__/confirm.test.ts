@@ -1,5 +1,6 @@
+import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
-import { decideTier } from '../safety/confirm.js';
+import { decideTier, runT1Countdown } from '../safety/confirm.js';
 import type { BuyIntent, SellIntent, SendIntent } from '@hiepht/opentrade-core/schemas';
 
 const buy = (chain: 'base' | 'eth' | 'sol' | 'bsc', amountWei: string): BuyIntent => ({
@@ -72,8 +73,42 @@ describe('decideTier', () => {
     expect(d.tier).toBe('T2');
   });
 
-  it('T1 fallback when balance unknown for buy', () => {
+  it('T2 fallback when wallet/trade sizing unknown for buy (safer default)', () => {
+    // P1-4: when both walletBalanceWei and walletUsd/tradeUsd are missing we
+    // can't bound the trade as a fraction of wallet, so we escalate to T2.
     const d = decideTier({ intent: buy('base', '1') });
-    expect(d.tier).toBe('T1');
+    expect(d.tier).toBe('T2');
+  });
+
+  it('T0/T1/T2 via USD-shape sizing (TUI path)', () => {
+    // Same buy intent on base, varied walletUsd vs tradeUsd ratios.
+    expect(decideTier({ intent: buy('base', '1'), walletUsd: 1000, tradeUsd: 5 }).tier).toBe('T0'); // 0.5%
+    expect(decideTier({ intent: buy('base', '1'), walletUsd: 1000, tradeUsd: 30 }).tier).toBe('T1'); // 3%
+    expect(decideTier({ intent: buy('base', '1'), walletUsd: 1000, tradeUsd: 100 }).tier).toBe('T2'); // 10%
+  });
+});
+
+describe('runT1Countdown (P1-3 — manual replacement for clack confirm)', () => {
+  it('resolves true on timeout (no TTY → auto-yes)', async () => {
+    // PassThrough is not a TTY (isTTY undefined) — we exercise the headless
+    // path. The countdown should complete naturally and resolve true.
+    const stdin = new PassThrough() as unknown as NodeJS.ReadStream;
+    const stdout = new PassThrough() as unknown as NodeJS.WriteStream;
+    const start = Date.now();
+    const result = await runT1Countdown(120, { stdin, stdout });
+    const dur = Date.now() - start;
+    expect(result).toBe(true);
+    expect(dur).toBeGreaterThanOrEqual(100);
+    expect(dur).toBeLessThan(500);
+  });
+
+  it('resolves quickly with a tiny window — no dangling listeners', async () => {
+    // The bug being fixed (clack races a setTimeout vs `p.confirm` and the
+    // confirm prompt keeps stdin in raw mode after the race). Verifying the
+    // function returns within a tight window confirms cleanup happens.
+    const stdin = new PassThrough() as unknown as NodeJS.ReadStream;
+    const stdout = new PassThrough() as unknown as NodeJS.WriteStream;
+    const result = await runT1Countdown(50, { stdin, stdout });
+    expect(result).toBe(true);
   });
 });

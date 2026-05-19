@@ -1,8 +1,8 @@
 // `opentrade limit <buy|sell> <chain> <token> <amount> --at <price>`
 //
-// Builds a LimitIntent. Since core/dispatcher returns a "not yet wired" error
-// for limit orders, we route via this command with --dry-run safe; the actual
-// strategy create lands when the core service is filled in.
+// Builds a LimitIntent and dispatches through the same path as `buy`/`sell`:
+// snapshot fetch → safety gate → tier policy → preview → confirmation. The
+// previous version only gated on --yes (skipped safety entirely) — P1-10 fix.
 
 import { defineCommand } from 'citty';
 import type { Chain } from '@hiepht/opentrade-core/chains';
@@ -10,8 +10,10 @@ import { nativeAmountToWei } from '@hiepht/opentrade-core/chains';
 import type { LimitIntent } from '@hiepht/opentrade-core/schemas';
 import { LimitIntentSchema } from '@hiepht/opentrade-core/schemas';
 import { dispatch } from '@hiepht/opentrade-core/actions';
+import { fetchTokenSnapshot } from '@hiepht/opentrade-core/services';
 import { bootstrap, exitWithError, flag, intFlag, parseChainArg } from './_shared.js';
-import { emitJson, log } from '../render/cli-renderer.js';
+import { decideTier, runConfirmation } from '../safety/confirm.js';
+import { emitJson, log, color } from '../render/cli-renderer.js';
 import { walletFor } from '../config/wallets.js';
 
 export const limitCmd = defineCommand({
@@ -26,6 +28,7 @@ export const limitCmd = defineCommand({
     slip: { type: 'string', description: 'slippage %' },
     yes: { type: 'boolean' },
     'dry-run': { type: 'boolean' },
+    'allow-risky': { type: 'boolean', description: 'override safety.warn (still requires T3)' },
     json: { type: 'boolean' },
   },
   async run({ args }) {
@@ -68,8 +71,50 @@ export const limitCmd = defineCommand({
       emitJson({ kind: 'dry-run', intent, wallet });
       return;
     }
-    if (!flag(args as Record<string, unknown>, 'yes')) {
-      log.warn('limit orders are a money-moving op — pass --yes to dispatch (placeholder until core service lands)');
+
+    // P1-10: pull token snapshot for safety preview + tier policy (parity
+    // with `buy` / `sell` subcommands).
+    let snapshot;
+    try {
+      snapshot = await fetchTokenSnapshot(ctx.client, { chain, token: args.token, walletAddress: wallet! });
+    } catch (err) {
+      exitWithError(`failed to fetch token: ${(err as Error).message}`);
+    }
+
+    if (snapshot.safety.block) {
+      const out = {
+        ok: false,
+        reason: 'safety_block',
+        gates: snapshot.safety.reasons,
+      };
+      if (flag(args as Record<string, unknown>, 'json')) emitJson(out);
+      else log.error(color.red(`BLOCK — ${snapshot.safety.reasons.join('; ')}`));
+      process.exit(3);
+    }
+
+    // Treat limit as a money-moving op: re-use the same tier policy
+    // (T1 baseline, T3 on safety.warn, T2 on ETH mainnet by virtue of the
+    // canonical decideTier; we feed it the limit intent directly).
+    const decision = decideTier({
+      intent,
+      safetyWarn: snapshot.safety.warn && !flag(args as Record<string, unknown>, 'allow-risky'),
+      noConfirm: ctx.loaded.config.noConfirm,
+    });
+
+    const preview = [
+      `${color.bold('Limit ' + intent.side)} ${snapshot.token.symbol} @ $${triggerPriceUsd}`,
+      `  chain=${chain}  ${amountPct ? `amount=${amountPct}%` : `amount_wei=${amountWei}`}  slip=${slippageBps !== undefined ? `${(slippageBps / 100).toFixed(1)}%` : 'default'}${expireSec ? `  expire=${expireSec}s` : ''}`,
+      `  tier=${decision.tier}  reason=${decision.reason}`,
+    ];
+    const ok = await runConfirmation({
+      tier: decision.tier,
+      intent,
+      previewLines: preview,
+      tokenSymbol: snapshot.token.symbol,
+      forceYes: flag(args as Record<string, unknown>, 'yes'),
+    });
+    if (!ok) {
+      log.warn('cancelled');
       process.exit(1);
     }
 
@@ -77,6 +122,7 @@ export const limitCmd = defineCommand({
     if (flag(args as Record<string, unknown>, 'json')) emitJson(result);
     else if (result.ok) log.success(`submitted: ${JSON.stringify(result.result)}`);
     else log.error(result.reason === 'error' ? result.error.message : result.reason);
+    if (!result.ok) process.exit(4);
   },
 });
 

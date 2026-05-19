@@ -27,7 +27,7 @@ export function userInfo(client: GmgnClient): Promise<unknown> {
 
 export function walletHoldings(
   client: GmgnClient,
-  args: { chain: Chain; walletAddress: string; limit?: number },
+  args: { chain: Chain; walletAddress: string; limit?: number; signal?: AbortSignal },
 ): Promise<{ holdings?: Holding[]; list?: Holding[] }> {
   return client.call({
     method: 'GET',
@@ -41,6 +41,7 @@ export function walletHoldings(
       hide_closed: 'true',
       hide_airdrop: 'true',
     },
+    ...(args.signal ? { signal: args.signal } : {}),
   });
 }
 
@@ -259,31 +260,34 @@ export function trenches(client: GmgnClient, args: { chain: Chain }): Promise<un
 
 export function tokenInfo(
   client: GmgnClient,
-  args: { chain: Chain; token: string },
+  args: { chain: Chain; token: string; signal?: AbortSignal },
 ): Promise<TokenInfo> {
   return client.call({
     method: 'GET',
     subPath: '/defi/quotation/v1/tokens/' + chainParam(args.chain) + '/' + args.token,
+    ...(args.signal ? { signal: args.signal } : {}),
   });
 }
 
 export function tokenSecurity(
   client: GmgnClient,
-  args: { chain: Chain; token: string },
+  args: { chain: Chain; token: string; signal?: AbortSignal },
 ): Promise<TokenSecurity> {
   return client.call({
     method: 'GET',
     subPath: '/defi/quotation/v1/tokens/security/' + chainParam(args.chain) + '/' + args.token,
+    ...(args.signal ? { signal: args.signal } : {}),
   });
 }
 
 export function poolInfo(
   client: GmgnClient,
-  args: { chain: Chain; token: string },
+  args: { chain: Chain; token: string; signal?: AbortSignal },
 ): Promise<PoolInfo> {
   return client.call({
     method: 'GET',
     subPath: '/defi/quotation/v1/tokens/pool_info/' + chainParam(args.chain) + '/' + args.token,
+    ...(args.signal ? { signal: args.signal } : {}),
   });
 }
 

@@ -99,4 +99,21 @@ describe('audit log', () => {
       rmSync(home, { recursive: true, force: true });
     }
   });
+
+  it('P1-8: audit ledger file is mode 0o600 (owner read/write only)', async () => {
+    const home = mkdtempSync(path.join(os.tmpdir(), 'ot-aud-'));
+    try {
+      const paths = resolvePaths({ homeOverride: home });
+      await recordTrade(sampleSuccess, { paths });
+      const files = readdirSync(paths.configDir).filter((f) => f.startsWith('trades_'));
+      expect(files.length).toBeGreaterThan(0);
+      const { statSync } = await import('node:fs');
+      const st = statSync(path.join(paths.configDir, files[0]!));
+      // Mask sticky/group bits — only check the low 9 owner/group/other bits.
+      // 0o600 = owner read+write, group=other=nothing.
+      expect(st.mode & 0o777).toBe(0o600);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
 });
