@@ -434,8 +434,17 @@ export const App: React.FC<AppProps> = (props) => {
 
   // -- global key handler ---------------------------------------------------
   // Routed via InputBar.shouldConsume so paste / typing still works.
+  //
+  // The focus gate is enforced inside mapHotkey: when inputBuffer is non-empty
+  // or a modal/slash overlay is open, single-letter and digit hotkeys return
+  // null so the InputBar can append them as content. Only Esc / Enter / Tab
+  // (when no overlay) / Ctrl+C still fire as hotkeys.
   const handleHotkey = (input: string, key: import('ink').Key): boolean => {
-    const evt = mapHotkey(input, key);
+    const evt = mapHotkey(input, key, {
+      inputBufferLength: inputBuffer.length,
+      modalOpen: modalStack.length > 0,
+      slashOpen,
+    });
     if (!evt) return false;
 
     // Modal stack absorbs Enter/Esc/typing without firing global actions.
@@ -636,7 +645,12 @@ export const App: React.FC<AppProps> = (props) => {
         </Box>
       ) : null}
 
-      <Footer hints={currentScreen?.hints} statusMessage={statusMessage} statusTone={statusTone} />
+      <Footer
+        hints={currentScreen?.hints}
+        statusMessage={statusMessage}
+        statusTone={statusTone}
+        typing={inputBuffer.length > 0}
+      />
 
       <InputBar
         buffer={inputBuffer}

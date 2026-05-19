@@ -134,6 +134,62 @@ describe('App paste + Tab + preset 1', () => {
     expect(first?.token).toBe(TOKEN_A);
   });
 
+  it('typing letters that look like hotkeys does NOT trigger buy/sell — buffer accumulates', async () => {
+    // Bug fix verification (2026-05-19): user typed "base" and the TUI flipped
+    // to buy-mode + sell-mode + info + refresh + opened chain palette. The
+    // mapHotkey focus gate must suppress letter hotkeys while inputBuffer > 0.
+    const onIntent = vi.fn();
+    const { stdin } = render(
+      tree({
+        ...baseProps,
+        initialSnapshot: snap(TOKEN_A, false),
+        onIntent,
+      }),
+    );
+    await settle(60);
+    expect(useTuiStore.getState().mode).toBe('buy');
+    // Type chars one at a time — each <30ms apart so they flow through onChar.
+    // First letter is `b` which IS a hotkey when buffer is empty → first char
+    // triggers force_buy (no-op since we're already in buy mode). The remaining
+    // letters land while buffer length is the slash-prefilled '/' (no, actually
+    // buffer starts empty here). Let's instead type a non-hotkey first char to
+    // seed the buffer, then verify subsequent hotkey letters DO NOT fire.
+    stdin.write('x'); // unmapped — flows into buffer (length 1)
+    await settle(50);
+    // Now buffer is "x" — typing 'b' should NOT fire force_buy, 's' should NOT
+    // fire force_sell, etc. We verify by checking mode never flipped to sell.
+    stdin.write('b');
+    await settle(50);
+    stdin.write('a');
+    await settle(50);
+    stdin.write('s');
+    await settle(50);
+    stdin.write('e');
+    await settle(50);
+    expect(useTuiStore.getState().mode).toBe('buy'); // unchanged
+    // No buy/sell intents dispatched from typing.
+    const intentKinds = onIntent.mock.calls.map((c) => c[0]?.kind);
+    expect(intentKinds).not.toContain('buy');
+    expect(intentKinds).not.toContain('sell');
+  });
+
+  it('first letter while buffer empty still fires hotkey (gate only kicks in when typing)', async () => {
+    // Sanity: the gate doesn't break the empty-buffer behaviour. Pressing 'b'
+    // with an empty buffer flips to BUY (no-op here) — but more importantly
+    // pressing 's' from a fresh buffer flips to SELL.
+    const { stdin } = render(
+      tree({
+        ...baseProps,
+        initialSnapshot: snap(TOKEN_A, false),
+      }),
+    );
+    await settle(60);
+    expect(useTuiStore.getState().mode).toBe('buy');
+    stdin.write('s'); // buffer empty → hotkey fires
+    await settle(50);
+    expect(useTuiStore.getState().mode).toBe('sell');
+  });
+
   it('race: paste TOKEN_A then paste TOKEN_B before fetch1 resolves — Screen reflects TOKEN_B only', async () => {
     let resolveFirst: ((s: TokenSnapshot) => void) | undefined;
     const fetchImpl = vi.fn(async (_client: unknown, args: { token: string }) => {
