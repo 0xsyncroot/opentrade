@@ -198,7 +198,7 @@ export const App: React.FC<AppProps> = (props) => {
     chain,
     walletAddress,
     tokenAddress: currentTokenAddr,
-    paused: isTyping || modalStack.length > 0 || slashOpen || recentOverlayOpen || testMode === true,
+    paused: isTyping || modalStack.length > 0 || slashOpen || recentOverlayOpen || helpOpen || testMode === true,
   });
   useEffect(() => {
     if (snapshotQuery.data) {
@@ -213,7 +213,7 @@ export const App: React.FC<AppProps> = (props) => {
     walletAddress,
     // P1-12: pause holdings polling when ANY modal/slash overlay is open so
     // an open confirm modal can't see the position size change mid-confirm.
-    paused: isTyping || modalStack.length > 0 || slashOpen || recentOverlayOpen || testMode === true,
+    paused: isTyping || modalStack.length > 0 || slashOpen || recentOverlayOpen || helpOpen || testMode === true,
     intervalMs: view === 'positions' ? 5_000 : 10_000,
     // P1-C: when bot reports a Telegram trade landed, force immediate refetch.
     tradeEventNonce,
@@ -224,6 +224,10 @@ export const App: React.FC<AppProps> = (props) => {
 
   // -- bot lifecycle (auto-start on mount) ---------------------------------
   const dispatcherCtxRef = useRef<DispatcherContext | undefined>(undefined);
+  // P0-5: timestamp of the last bare `q` press — second `q` within 2 s
+  // teardowns; otherwise the warn toast guides the user. Ctrl+C bypasses
+  // (sets evt.fromCtrl=true). Stored in a ref so re-renders don't reset it.
+  const quitArmedAtRef = useRef<number>(0);
   useEffect(() => {
     if (!client) return undefined;
     if (!props.config) return undefined;
@@ -740,10 +744,13 @@ export const App: React.FC<AppProps> = (props) => {
     const evt = mapHotkey(input, key, {
       inputBufferLength: inputBuffer.length,
       modalOpen: modalStack.length > 0,
-      // Recent overlay owns input the same way slash palette does — gate
-      // letter/digit hotkeys so typing while overlay is open doesn't trigger
-      // force_buy / refresh / etc.
-      slashOpen: slashOpen || recentOverlayOpen,
+      slashOpen,
+      // P0-1: passing helpOpen + recentOpen explicitly so mapHotkey can
+      // route ↑↓ / j/k into list_up/list_down events for each overlay.
+      // Previously these were OR'd into slashOpen as a quick gate, which
+      // killed the cursor navigation we wanted.
+      helpOpen,
+      recentOpen: recentOverlayOpen,
     });
     if (!evt) return false;
 
@@ -834,7 +841,19 @@ export const App: React.FC<AppProps> = (props) => {
 
     switch (evt.kind) {
       case 'quit':
-        void teardownAndExit();
+        // P0-5: two-tap quit guard. The `evt.kind === 'quit'` event fires for
+        // BOTH `q` keypress AND `Ctrl+C`. Ctrl+C / `/quit` should still
+        // teardown immediately (they're explicit). A bare `q` is easy to
+        // fat-finger when navigating positions / info — require two presses
+        // within 2 s. Tracking the timestamp via ref so re-renders don't
+        // reset it.
+        if (evt.fromCtrl === true || quitArmedAtRef.current && Date.now() - quitArmedAtRef.current < 2000) {
+          quitArmedAtRef.current = 0;
+          void teardownAndExit();
+          return true;
+        }
+        quitArmedAtRef.current = Date.now();
+        setStatus('Press q again to quit (or Esc to cancel)', 'warn');
         return true;
       case 'help':
         openHelp();

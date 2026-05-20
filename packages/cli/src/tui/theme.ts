@@ -1,19 +1,25 @@
 // Theme — semantic color tokens used by every TUI component.
 //
-// Mapped to Ink Text `color` prop values (ANSI named colors). Keeping these as
-// constants lets us swap palettes without touching components.
+// Round 7 UX upgrade: switched from ANSI named colors (cyan/magenta/red/...)
+// to a muted hex palette inspired by Claude Code CLI's branding. Anchor color
+// is claude-orange (#D97757) used for the brand + primary interactive
+// elements. Chrome stays in muted gray (#7C7C7C) so the orange pops without
+// fighting the rest of the UI. Ink renders hex colors on any TrueColor
+// terminal (modern macOS Terminal, iTerm2, Wezterm, Windows Terminal, most
+// Linux DEs). Falls back to nearest 256-color elsewhere.
 
 export const theme = {
-  primary: 'cyan',
-  primaryAlt: 'cyanBright',
-  danger: 'red',
-  warn: 'yellow',
-  safe: 'green',
-  muted: 'gray',
-  text: 'white',
-  dim: 'gray',
-  accent: 'magenta',
-  info: 'blue',
+  primary: '#D97757',     // claude-orange — brand + primary interactive
+  primaryAlt: '#E58D6F',  // brighter shade for hover/focus highlights
+  accent: '#D97757',
+  text: '#E5E5E5',        // body
+  muted: '#7C7C7C',       // chrome / dim labels
+  dim: '#5C5C5C',         // tertiary chrome
+  safe: '#5DB075',        // success
+  warn: '#E5B567',        // warning
+  danger: '#E26D5C',      // error / block
+  info: '#7C9BC9',        // informational toasts
+  border: '#3A3A3A',      // subtle frames
 } as const;
 
 export type ThemeColor = (typeof theme)[keyof typeof theme];
@@ -63,5 +69,25 @@ export function blockTone(tone: 'info' | 'warn' | 'error' | 'success' | undefine
     case 'info':
     default:
       return theme.text;
+  }
+}
+
+/**
+ * Map a statusMessage `tone` to a glyph + color pair. Used by Footer toasts.
+ */
+export function statusTone(tone: 'info' | 'warn' | 'error' | 'success' | undefined): {
+  color: ThemeColor;
+  glyph: string;
+} {
+  switch (tone) {
+    case 'success':
+      return { color: theme.safe, glyph: '✓' };
+    case 'warn':
+      return { color: theme.warn, glyph: '⚠' };
+    case 'error':
+      return { color: theme.danger, glyph: '✗' };
+    case 'info':
+    default:
+      return { color: theme.info, glyph: 'ℹ' };
   }
 }

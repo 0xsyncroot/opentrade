@@ -56,10 +56,39 @@ export const botCmd = defineCommand({
         const defaultChain: Chain = (cfg.defaultChain ?? 'base') as Chain;
         const wallets = (cfg.wallets ?? {}) as Partial<Record<Chain, string>>;
 
-        // Write PID file using the current process PID — the bot runs INLINE.
+        // P0-2 fix: install signal handlers BEFORE writing the PID file +
+        // before awaiting startBot, so SIGTERM landing during the startup
+        // window doesn't leave a stale PID file that the next `bot start`
+        // refuses to overwrite ("already running"). The handler is
+        // status-aware via the `started` flag so it only attempts a
+        // graceful bot stop if startBot actually resolved.
+        let handle: Awaited<ReturnType<typeof botModule.startBot>> | undefined;
+        let shuttingDown = false;
+        let started = false;
+        const stop = async (sig: string): Promise<void> => {
+          if (shuttingDown) return;
+          shuttingDown = true;
+          process.stderr.write(`[bot] received ${sig}, stopping…\n`);
+          if (started && handle) {
+            try {
+              await Promise.race([
+                handle.stop(),
+                new Promise<void>((res) => setTimeout(res, 5_000)),
+              ]);
+            } catch {
+              /* swallow */
+            }
+          }
+          try { fs.unlinkSync(paths.botPidFile); } catch { /* */ }
+          process.exit(0);
+        };
+        process.on('SIGINT', () => void stop('SIGINT'));
+        process.on('SIGTERM', () => void stop('SIGTERM'));
+
+        // Pre-create the parent dir but DO NOT write PID until startBot
+        // succeeds — a SIGTERM during startup will unlink (a no-op since the
+        // file doesn't exist yet) and we exit cleanly with no leak.
         fs.mkdirSync(path.dirname(paths.botPidFile), { recursive: true });
-        fs.writeFileSync(paths.botPidFile, String(process.pid), { mode: 0o600 });
-        try { fs.chmodSync(paths.botPidFile, 0o600); } catch { /* */ }
 
         const logger = {
           info: (m: string) => process.stderr.write(`[bot] ${m}\n`),
@@ -68,7 +97,6 @@ export const botCmd = defineCommand({
 
         log.success(`starting bot (pid ${process.pid}). Send SIGTERM or run \`opentrade bot stop\` to stop.`);
 
-        let handle: Awaited<ReturnType<typeof botModule.startBot>> | undefined;
         try {
           handle = await botModule.startBot({
             telegramBotToken: cfg.telegram.botToken,
@@ -78,30 +106,15 @@ export const botCmd = defineCommand({
             defaultChain,
             logger,
           });
+          started = true;
+          // PID file written only after a successful start.
+          fs.writeFileSync(paths.botPidFile, String(process.pid), { mode: 0o600 });
+          try { fs.chmodSync(paths.botPidFile, 0o600); } catch { /* */ }
         } catch (err) {
           log.error(`failed to start: ${(err as Error).message}`);
           try { fs.unlinkSync(paths.botPidFile); } catch { /* */ }
           process.exit(1);
         }
-
-        let shuttingDown = false;
-        const stop = async (sig: string): Promise<void> => {
-          if (shuttingDown) return;
-          shuttingDown = true;
-          process.stderr.write(`[bot] received ${sig}, stopping…\n`);
-          try {
-            await Promise.race([
-              handle!.stop(),
-              new Promise<void>((res) => setTimeout(res, 5_000)),
-            ]);
-          } catch {
-            /* swallow */
-          }
-          try { fs.unlinkSync(paths.botPidFile); } catch { /* */ }
-          process.exit(0);
-        };
-        process.on('SIGINT', () => void stop('SIGINT'));
-        process.on('SIGTERM', () => void stop('SIGTERM'));
 
         // P1-G: keep the loop alive UNTIL either SIGTERM (handled above) OR
         // the bot reports an unexpected status. If grammY's polling crashes

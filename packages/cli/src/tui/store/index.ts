@@ -187,10 +187,22 @@ export const useTuiStore = create<TuiState>((set, _get) => ({
   setHistoryIndex: (i) => set({ historyIndex: i }),
   setHistory: (entries) =>
     set({
-      // Defensive: cap + dedupe consecutive duplicates same as pushHistory.
-      inputHistory: entries
-        .filter((e, i, arr) => e && e !== arr[i - 1])
-        .slice(-50),
+      // P1-11 fix: full-set dedupe (keep LAST occurrence) to match
+      // `pushHistory` semantics. Previously this only deduped CONSECUTIVE
+      // duplicates so an older history.json carrying interleaved dupes
+      // would leak them through hydration. Cap at 50 entries.
+      inputHistory: (() => {
+        const seen = new Set<string>();
+        const result: string[] = [];
+        // Walk backwards so the LAST occurrence of each unique entry survives.
+        for (let i = entries.length - 1; i >= 0; i--) {
+          const e = entries[i];
+          if (!e || seen.has(e)) continue;
+          seen.add(e);
+          result.unshift(e);
+        }
+        return result.slice(-50);
+      })(),
       historyIndex: -1,
     }),
   setOverrideRisky: (b) => set({ overrideRisky: b }),

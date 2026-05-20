@@ -53,7 +53,7 @@ export type HotkeyEvent =
   | { kind: 'submit' }
   | { kind: 'escape' }
   | { kind: 'toggle_bot' }
-  | { kind: 'quit' };
+  | { kind: 'quit'; fromCtrl?: boolean };
 
 /** Context for `mapHotkey` — focus state so we can gate letter shortcuts. */
 export interface HotkeyContext {
@@ -66,6 +66,11 @@ export interface HotkeyContext {
   /** True while the slash palette is open — same rule as modalOpen: only
    *  control keys fire as hotkeys, the rest belongs to the slash text. */
   slashOpen?: boolean;
+  /** True while the help overlay is open — same gating. */
+  helpOpen?: boolean;
+  /** True while the recent-history overlay is open — same gating, plus
+   *  ↑↓ / j/k drive the recent list cursor. */
+  recentOpen?: boolean;
 }
 
 /**
@@ -84,7 +89,7 @@ export function mapHotkey(
   ctx: HotkeyContext = {},
 ): HotkeyEvent | null {
   // Always-on control keys — typed content cannot collide with these.
-  if (key.ctrl && (input === 'c' || input === 'd')) return { kind: 'quit' };
+  if (key.ctrl && (input === 'c' || input === 'd')) return { kind: 'quit', fromCtrl: true };
   if (key.escape) return { kind: 'escape' };
   if (key.return) return { kind: 'submit' };
 
@@ -97,8 +102,23 @@ export function mapHotkey(
     return { kind: 'flip' };
   }
 
-  // Arrow keys never map to global hotkeys — they're handled by the
-  // InputBar (history nav) and list views (cursor).
+  // P0-1 fix: when a list overlay is open (slash palette / recent history /
+  // help / positions view), arrow keys AND j/k/g/G drive the cursor — they
+  // must override BOTH the early arrow-null return below AND the letter focus
+  // gate. Without this the ▶ cursor in SlashPalette / RecentOverlay is
+  // cosmetic and Enter submits the raw input instead of the highlighted item.
+  const overlayOpen = ctx.slashOpen === true || ctx.recentOpen === true || ctx.helpOpen === true;
+  if (overlayOpen) {
+    if (key.upArrow || input === 'k') return { kind: 'list_up' };
+    if (key.downArrow || input === 'j') return { kind: 'list_down' };
+    if (input === 'g') return { kind: 'list_top' };
+    if (input === 'G') return { kind: 'list_bottom' };
+    // Other arrows fall through to be ignored.
+  }
+
+  // Arrow keys never map to global hotkeys outside of overlay nav above.
+  // The InputBar's onKey handler picks them up for history navigation when
+  // its buffer is empty.
   if (key.upArrow || key.downArrow || key.leftArrow || key.rightArrow) {
     return null;
   }
@@ -108,7 +128,9 @@ export function mapHotkey(
   const gated =
     (ctx.inputBufferLength !== undefined && ctx.inputBufferLength > 0) ||
     ctx.modalOpen === true ||
-    ctx.slashOpen === true;
+    ctx.slashOpen === true ||
+    ctx.helpOpen === true ||
+    ctx.recentOpen === true;
   if (gated) return null;
 
   // Number keys 1-4

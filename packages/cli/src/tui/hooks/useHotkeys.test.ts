@@ -39,9 +39,9 @@ describe('mapHotkey', () => {
     expect(evt).toEqual({ kind: 'escape' });
   });
 
-  it('Ctrl+C → quit', () => {
+  it('Ctrl+C → quit (with fromCtrl=true to bypass two-tap guard)', () => {
     const evt = mapHotkey('c', { ...KEY, ctrl: true });
-    expect(evt).toEqual({ kind: 'quit' });
+    expect(evt).toEqual({ kind: 'quit', fromCtrl: true });
   });
 
   it('q → quit', () => {
@@ -129,9 +129,10 @@ describe('mapHotkey', () => {
       expect(mapHotkey('q', KEY, TYPING_CTX)).toBeNull();
     });
 
-    it('Ctrl+C STILL fires (always-on quit)', () => {
+    it('Ctrl+C STILL fires (always-on quit, fromCtrl bypasses two-tap)', () => {
       expect(mapHotkey('c', { ...KEY, ctrl: true }, TYPING_CTX)).toEqual({
         kind: 'quit',
+        fromCtrl: true,
       });
     });
 
