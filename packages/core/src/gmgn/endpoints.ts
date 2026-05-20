@@ -237,22 +237,32 @@ export function kline(
   return client.call({ method: 'GET', subPath: '/v1/market/token_kline', query: q });
 }
 
+// Endpoint paths now follow the CANONICAL gmgn-cli skill table
+// (.claude/skills/gmgn-{token,market,track}/SKILL.md). Earlier versions
+// fabricated `/defi/quotation/v1/...` paths from misremembered GMGN docs —
+// those routes don't exist on openapi.gmgn.ai and Cloudflare's WAF returns
+// a 403 with a "Just a moment..." HTML challenge page (root cause of the
+// user's "Fetch failed: ... HTTP 403" bug in 0.1.1). Use this file as the
+// source of truth and reference SKILL.md when adding endpoints.
+
 export function trending(
   client: GmgnClient,
   args: { chain: Chain; window?: '1m' | '5m' | '1h' | '6h' | '24h' },
 ): Promise<{ rank?: unknown[] }> {
   return client.call({
     method: 'GET',
-    subPath: '/defi/quotation/v1/rank/trending_tokens',
+    subPath: '/v1/market/rank',
     query: { chain: chainParam(args.chain), time: args.window ?? '5m' },
   });
 }
 
 export function trenches(client: GmgnClient, args: { chain: Chain }): Promise<unknown> {
+  // Per skill table this is POST (not GET) — the body is empty but the
+  // verb matters for the GMGN router.
   return client.call({
-    method: 'GET',
-    subPath: '/defi/quotation/v1/rank/trenches',
-    query: { chain: chainParam(args.chain) },
+    method: 'POST',
+    subPath: '/v1/trenches',
+    body: { chain: chainParam(args.chain) },
   });
 }
 
@@ -264,7 +274,8 @@ export function tokenInfo(
 ): Promise<TokenInfo> {
   return client.call({
     method: 'GET',
-    subPath: '/defi/quotation/v1/tokens/' + chainParam(args.chain) + '/' + args.token,
+    subPath: '/v1/token/info',
+    query: { chain: chainParam(args.chain), address: args.token },
     ...(args.signal ? { signal: args.signal } : {}),
   });
 }
@@ -275,7 +286,8 @@ export function tokenSecurity(
 ): Promise<TokenSecurity> {
   return client.call({
     method: 'GET',
-    subPath: '/defi/quotation/v1/tokens/security/' + chainParam(args.chain) + '/' + args.token,
+    subPath: '/v1/token/security',
+    query: { chain: chainParam(args.chain), address: args.token },
     ...(args.signal ? { signal: args.signal } : {}),
   });
 }
@@ -286,7 +298,8 @@ export function poolInfo(
 ): Promise<PoolInfo> {
   return client.call({
     method: 'GET',
-    subPath: '/defi/quotation/v1/tokens/pool_info/' + chainParam(args.chain) + '/' + args.token,
+    subPath: '/v1/token/pool_info',
+    query: { chain: chainParam(args.chain), address: args.token },
     ...(args.signal ? { signal: args.signal } : {}),
   });
 }
@@ -297,8 +310,12 @@ export function topHolders(
 ): Promise<{ list?: unknown[] }> {
   return client.call({
     method: 'GET',
-    subPath: '/defi/quotation/v1/tokens/top_holders/' + chainParam(args.chain) + '/' + args.token,
-    query: { limit: args.limit ?? 50 },
+    subPath: '/v1/market/token_top_holders',
+    query: {
+      chain: chainParam(args.chain),
+      address: args.token,
+      limit: args.limit ?? 20,
+    },
   });
 }
 
@@ -308,8 +325,12 @@ export function topTraders(
 ): Promise<{ list?: unknown[] }> {
   return client.call({
     method: 'GET',
-    subPath: '/defi/quotation/v1/tokens/top_traders/' + chainParam(args.chain) + '/' + args.token,
-    query: { limit: args.limit ?? 50 },
+    subPath: '/v1/market/token_top_traders',
+    query: {
+      chain: chainParam(args.chain),
+      address: args.token,
+      limit: args.limit ?? 20,
+    },
   });
 }
 
@@ -321,8 +342,12 @@ export function smartMoneyTrades(
 ): Promise<{ list?: unknown[] }> {
   return client.call({
     method: 'GET',
-    subPath: '/defi/quotation/v1/smartmoney/' + chainParam(args.chain) + '/tx',
-    query: { time: args.window ?? '30m', limit: args.limit ?? 50 },
+    subPath: '/v1/user/smartmoney',
+    query: {
+      chain: chainParam(args.chain),
+      time: args.window ?? '30m',
+      limit: args.limit ?? 50,
+    },
   });
 }
 
@@ -332,7 +357,11 @@ export function kolTrades(
 ): Promise<{ list?: unknown[] }> {
   return client.call({
     method: 'GET',
-    subPath: '/defi/quotation/v1/kol/' + chainParam(args.chain) + '/tx',
-    query: { time: args.window ?? '30m', limit: args.limit ?? 50 },
+    subPath: '/v1/user/kol',
+    query: {
+      chain: chainParam(args.chain),
+      time: args.window ?? '30m',
+      limit: args.limit ?? 50,
+    },
   });
 }
