@@ -247,22 +247,55 @@ export function kline(
 
 export function trending(
   client: GmgnClient,
-  args: { chain: Chain; window?: '1m' | '5m' | '1h' | '6h' | '24h' },
+  args: { chain: Chain; interval?: '1m' | '5m' | '1h' | '6h' | '24h' },
 ): Promise<{ rank?: unknown[] }> {
+  // Param is `interval` per skill (--interval). Previous code sent `time`
+  // which GMGN silently ignored — caused empty results.
   return client.call({
     method: 'GET',
     subPath: '/v1/market/rank',
-    query: { chain: chainParam(args.chain), time: args.window ?? '5m' },
+    query: { chain: chainParam(args.chain), interval: args.interval ?? '1h' },
   });
 }
 
-export function trenches(client: GmgnClient, args: { chain: Chain }): Promise<unknown> {
-  // Per skill table this is POST (not GET) — the body is empty but the
-  // verb matters for the GMGN router.
+export interface TrenchesArgs {
+  chain: Chain;
+  /** Categories to query. Default = all three when omitted. */
+  type?: ('new_creation' | 'near_completion' | 'completed')[];
+  /** Launchpad platform filter (pump.fun / letsbonk / etc.). */
+  launchpadPlatform?: string[];
+  /** Max per category, max 80. Default 80. */
+  limit?: number;
+  /** Server-side filter preset. */
+  filterPreset?: 'safe' | 'smart-money' | 'strict';
+  /** Sort field. */
+  sortBy?:
+    | 'smart_degen_count'
+    | 'renowned_count'
+    | 'volume_24h'
+    | 'volume_1h'
+    | 'swaps_24h'
+    | 'swaps_1h'
+    | 'rug_ratio'
+    | 'holder_count'
+    | 'usd_market_cap'
+    | 'created_timestamp';
+  direction?: 'asc' | 'desc';
+}
+
+export function trenches(client: GmgnClient, args: TrenchesArgs): Promise<unknown> {
+  // POST per skill table — body shape matches the official gmgn-cli flags.
+  const body: Record<string, unknown> = { chain: chainParam(args.chain) };
+  if (args.type?.length) body.type = args.type;
+  if (args.launchpadPlatform?.length) body.launchpad_platform = args.launchpadPlatform;
+  if (args.limit !== undefined) body.limit = args.limit;
+  if (args.filterPreset) body.filter_preset = args.filterPreset;
+  if (args.sortBy) body.sort_by = args.sortBy;
+  if (args.direction) body.direction = args.direction;
   return client.call({
     method: 'POST',
     subPath: '/v1/trenches',
-    body: { chain: chainParam(args.chain) },
+    body,
   });
 }
 
@@ -304,64 +337,103 @@ export function poolInfo(
   });
 }
 
+export type HolderTag =
+  | 'smart_degen'
+  | 'renowned'
+  | 'fresh_wallet'
+  | 'dev'
+  | 'sniper'
+  | 'rat_trader'
+  | 'bundler'
+  | 'transfer_in'
+  | 'dex_bot'
+  | 'bluechip_owner';
+
 export function topHolders(
   client: GmgnClient,
-  args: { chain: Chain; token: string; limit?: number },
+  args: {
+    chain: Chain;
+    token: string;
+    limit?: number;
+    orderBy?: string;
+    direction?: 'asc' | 'desc';
+    tag?: HolderTag;
+  },
 ): Promise<{ list?: unknown[] }> {
-  return client.call({
-    method: 'GET',
-    subPath: '/v1/market/token_top_holders',
-    query: {
-      chain: chainParam(args.chain),
-      address: args.token,
-      limit: args.limit ?? 20,
-    },
-  });
+  // Skill defaults: limit=20, order_by=amount_percentage, direction=desc.
+  const q: Record<string, string | number> = {
+    chain: chainParam(args.chain),
+    address: args.token,
+    limit: args.limit ?? 20,
+    order_by: args.orderBy ?? 'amount_percentage',
+    direction: args.direction ?? 'desc',
+  };
+  if (args.tag) q.tag = args.tag;
+  return client.call({ method: 'GET', subPath: '/v1/market/token_top_holders', query: q });
 }
 
 export function topTraders(
   client: GmgnClient,
-  args: { chain: Chain; token: string; limit?: number },
+  args: {
+    chain: Chain;
+    token: string;
+    limit?: number;
+    orderBy?: string;
+    direction?: 'asc' | 'desc';
+    tag?: HolderTag;
+  },
 ): Promise<{ list?: unknown[] }> {
-  return client.call({
-    method: 'GET',
-    subPath: '/v1/market/token_top_traders',
-    query: {
-      chain: chainParam(args.chain),
-      address: args.token,
-      limit: args.limit ?? 20,
-    },
-  });
+  const q: Record<string, string | number> = {
+    chain: chainParam(args.chain),
+    address: args.token,
+    limit: args.limit ?? 20,
+    order_by: args.orderBy ?? 'amount_percentage',
+    direction: args.direction ?? 'desc',
+  };
+  if (args.tag) q.tag = args.tag;
+  return client.call({ method: 'GET', subPath: '/v1/market/token_top_traders', query: q });
 }
 
 // -- tracking ---------------------------------------------------------------
 
 export function smartMoneyTrades(
   client: GmgnClient,
-  args: { chain: Chain; window?: string; limit?: number },
+  args: {
+    chain: Chain;
+    /** Filter trades by side (buy/sell). Omit for both. */
+    side?: 'buy' | 'sell';
+    /** Page size 1-100, default 10 per skill. */
+    limit?: number;
+    /** Optional wallet filter. */
+    wallet?: string;
+  },
 ): Promise<{ list?: unknown[] }> {
-  return client.call({
-    method: 'GET',
-    subPath: '/v1/user/smartmoney',
-    query: {
-      chain: chainParam(args.chain),
-      time: args.window ?? '30m',
-      limit: args.limit ?? 50,
-    },
-  });
+  // Skill says params are --chain, --side, --limit, --wallet. The previous
+  // `time` param doesn't exist in the docs and was being silently dropped
+  // by the GMGN router — causing empty / stale results.
+  const q: Record<string, string | number> = {
+    chain: chainParam(args.chain),
+    limit: args.limit ?? 10,
+  };
+  if (args.side) q.side = args.side;
+  if (args.wallet) q.wallet = args.wallet;
+  return client.call({ method: 'GET', subPath: '/v1/user/smartmoney', query: q });
 }
 
 export function kolTrades(
   client: GmgnClient,
-  args: { chain: Chain; window?: string; limit?: number },
+  args: {
+    chain: Chain;
+    side?: 'buy' | 'sell';
+    limit?: number;
+    wallet?: string;
+  },
 ): Promise<{ list?: unknown[] }> {
-  return client.call({
-    method: 'GET',
-    subPath: '/v1/user/kol',
-    query: {
-      chain: chainParam(args.chain),
-      time: args.window ?? '30m',
-      limit: args.limit ?? 50,
-    },
-  });
+  const q: Record<string, string | number> = {
+    chain: chainParam(args.chain),
+    limit: args.limit ?? 10,
+  };
+  if (args.side) q.side = args.side;
+  if (args.wallet) q.wallet = args.wallet;
+  return client.call({ method: 'GET', subPath: '/v1/user/kol', query: q });
 }

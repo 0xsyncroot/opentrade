@@ -12,7 +12,8 @@ export const feedCmd = defineCommand({
     op: { type: 'positional', required: true, description: 'trending | sm | kol | trenches | kline' },
     token: { type: 'positional', required: false, description: 'token (kline only)' },
     chain: { type: 'string' },
-    window: { type: 'string', description: '5m | 1h | 6h | 24h' },
+    interval: { type: 'string', description: 'trending interval: 1m | 5m | 1h | 6h | 24h' },
+    side: { type: 'string', description: 'sm/kol: buy | sell' },
     resolution: { type: 'string', description: 'kline resolution (e.g. 5m)' },
     limit: { type: 'string' },
     json: { type: 'boolean' },
@@ -26,7 +27,7 @@ export const feedCmd = defineCommand({
       case 'trending': {
         const res = await gmgn.trending(ctx.client, {
           chain,
-          window: (args.window as '5m' | '1h' | '6h' | '24h') ?? '5m',
+          interval: (args.interval as '1m' | '5m' | '1h' | '6h' | '24h') ?? '1h',
         });
         if (wantsJson) emitJson(res);
         else log.info(JSON.stringify(res.rank?.slice(0, 20) ?? [], null, 2));
@@ -35,7 +36,7 @@ export const feedCmd = defineCommand({
       case 'sm': {
         const res = await gmgn.smartMoneyTrades(ctx.client, {
           chain,
-          ...(args.window ? { window: args.window } : {}),
+          ...(args.side === 'buy' || args.side === 'sell' ? { side: args.side } : {}),
           ...(args.limit ? { limit: Number(args.limit) } : {}),
         });
         if (wantsJson) emitJson(res);
@@ -45,7 +46,7 @@ export const feedCmd = defineCommand({
       case 'kol': {
         const res = await gmgn.kolTrades(ctx.client, {
           chain,
-          ...(args.window ? { window: args.window } : {}),
+          ...(args.side === 'buy' || args.side === 'sell' ? { side: args.side } : {}),
           ...(args.limit ? { limit: Number(args.limit) } : {}),
         });
         if (wantsJson) emitJson(res);
