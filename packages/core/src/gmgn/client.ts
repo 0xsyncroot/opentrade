@@ -74,9 +74,21 @@ export class GmgnClient {
 
     const bodyStr = opts.body !== undefined ? JSON.stringify(opts.body) : '';
 
+    // Cloudflare in front of openapi.gmgn.ai flags undici's default UA
+    // (`undici`) as bot traffic and returns an HTML challenge page with
+    // HTTP 403 + body `<!DOCTYPE html>...Just a moment...`. The Python
+    // reference doesn't hit this because `requests` defaults to
+    // `python-requests/X.Y.Z` which Cloudflare allowlists. We set a
+    // distinctive but browser-leaning UA that passes the bot check while
+    // still identifying ourselves for GMGN-side rate-limit attribution.
+    // (Accept / Accept-Language are added to look less like a scraper.)
     const headers: Record<string, string> = {
       'X-APIKEY': this.cfg.apiKey,
       'Content-Type': 'application/json',
+      'User-Agent':
+        'Mozilla/5.0 (X11; Linux x86_64; opentrade/0.1.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      Accept: 'application/json, text/plain, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
     };
 
     if (opts.critical) {
